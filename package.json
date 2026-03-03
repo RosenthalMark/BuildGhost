@@ -1,0 +1,21 @@
+{
+  "name": "buildghost",
+  "version": "1.0.0",
+  "description": "> **SYSTEM OVERVIEW:** A centralized GHOSTops-powered ecosystem for high-stakes software delivery. Engineered to replace legacy friction with bulletproof release gates and intelligent automation.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RosenthalMark/BuildGhost.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RosenthalMark/BuildGhost/issues"
+  },
+  "homepage": "https://github.com/RosenthalMark/BuildGhost#readme"
+}
