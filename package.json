@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/RosenthalMark/BuildGhost/issues"
   },
-  "homepage": "https://github.com/RosenthalMark/BuildGhost#readme"
+  "homepage": "https://github.com/RosenthalMark/BuildGhost#readme",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
 }

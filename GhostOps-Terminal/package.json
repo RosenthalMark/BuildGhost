@@ -1,0 +1,12 @@
+{
+  "name": "buildghost-terminal",
+  "version": "1.0.0",
+  "description": "GHOSTops Centralized Command",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "latest"
+  }
+}

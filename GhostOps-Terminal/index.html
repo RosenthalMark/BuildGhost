@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GHOSTops Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="hud-shell">
+      <aside class="sidebar panel-frame">
+        <header class="sidebar-header" id="logo-container">
+          <video id="intro-vid" src="./assets/GHOSTops-startup-sequence.mp4" autoplay muted playsinline></video>
+          <img id="static-logo" src="./assets/GHOSTops-terminal-logo-2.png" alt="GHOSTops Logo" style="display: none;" />
+        </header>
+
+        <nav class="tool-nav" aria-label="Tool Navigation">
+          <div class="sidebar-label" style="font-size: 0.65rem; color: #76ab72; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px; border-bottom: 1px solid rgb(57 255 20 / 0.15); padding-bottom: 6px;">Operational Modules</div>
+          <button class="nav-item active" data-route="tool" data-tool="SCRAPEtag">
+            <span class="nav-logo-wrap">
+              <img class="nav-tool-logo" src="../Toolbelt/SCRAPEtag/assets/SCRAPEtag-logo.png" alt="SCRAPEtag" />
+              <span class="tool-live-status" style="color: #39ff14; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+            </span>
+            <span class="nav-meta">Recon Harvesting</span>
+          </button>
+          <button class="nav-item" data-route="tool" data-tool="TESTops">
+            <span class="nav-logo-wrap">
+              <span class="nav-name">TESTops</span>
+              <span class="tool-live-status" style="color: #39ff14; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+            </span>
+            <span class="nav-meta">Scenario Firing</span>
+          </button>
+          <button class="nav-item" data-route="tool" data-tool="MOCKops">
+            <span class="nav-logo-wrap">
+              <span class="nav-name">MOCKops</span>
+              <span class="tool-live-status" style="color: #39ff14; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+            </span>
+            <span class="nav-meta">Payload Shaping</span>
+          </button>
+          <button class="nav-item" data-route="tool" data-tool="TRACEops">
+            <span class="nav-logo-wrap">
+              <span class="nav-name">TRACEops</span>
+              <span class="tool-live-status" style="color: #39ff14; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+            </span>
+            <span class="nav-meta">Signal Tracing</span>
+          </button>
+          <button class="nav-item nav-docs" data-route="docs" data-tool="SYSTEM">
+            <span class="nav-logo-wrap">
+              <span class="nav-name">SYSTEM DOCS</span>
+              <span class="tool-live-status" style="color: #76ab72; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+            </span>
+            <span class="nav-meta">Protocol Registry</span>
+          </button>
+          <div class="sidebar-fillers" style="opacity: 0.4; margin-top: 10px;">
+            <div class="nav-item" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
+            <div class="nav-item" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
+          </div>
+          <div class="sidebar-anchors" style="margin-top: auto; padding-top: 15px; border-top: 1px solid #1f3b20; display: flex; flex-direction: column; gap: 8px;">
+            <button class="nav-item" id="nav-settings" data-route="config">
+              <span class="nav-logo-wrap">
+                <span class="nav-name" style="margin: 0 auto; color: #76ab72;">[ SETTINGS ]</span>
+              </span>
+            </button>
+            <button class="nav-item" id="nav-signin" data-route="auth">
+              <span class="nav-logo-wrap">
+                <span class="nav-name" style="margin: 0 auto; color: #76ab72;">[ SIGN IN ]</span>
+              </span>
+            </button>
+          </div>
+        </nav>
+
+        <footer class="sidebar-footer panel-inner">
+          <div>
+            <p class="stat-label">Polling</p>
+            <p id="polling-status" class="stat-value">standby</p>
+          </div>
+          <div>
+            <p class="stat-label">Selected</p>
+            <p id="selected-status" class="stat-value">SCRAPEtag</p>
+          </div>
+        </footer>
+      </aside>
+
+      <main class="stage-wrap panel-frame">
+        <header class="stage-header panel-inner">
+          <div>
+            <p class="kicker">Tactical Stage</p>
+            <h2 id="stage-title">SCRAPEtag</h2>
+          </div>
+          <div class="signal-group">
+            <span class="signal-dot"></span>
+            <span id="tool-health">verifying</span>
+          </div>
+        </header>
+
+        <div id="nixie-scroller" class="nixie-scroller">
+          <span class="nixie-text">&gt; SYSTEM STANDBY... AWAITING CONTEXT_</span>
+        </div>
+
+        <section class="stage-main panel-inner">
+          <div class="window-stack">
+            <section class="window-frame shell-window">
+              <header class="window-topbar">
+                <span>Context Resolver</span>
+                <span id="stage-chip" class="stage-chip">pending</span>
+              </header>
+              <article id="stage-content" class="window-content fade-swap" aria-live="polite"></article>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="module-missing-template">
+      <section class="state-grid">
+        <div class="module-card">
+          <h3>Module Missing</h3>
+          <p id="missing-description"></p>
+          <dl class="meta-grid">
+            <div>
+              <dt>Expected Path</dt>
+              <dd id="missing-path"></dd>
+            </div>
+            <div>
+              <dt>Watcher</dt>
+              <dd>window.ghostOps.checkTool polling</dd>
+            </div>
+          </dl>
+          <button id="initialize-module" class="primary-action">INITIALIZE MODULE</button>
+        </div>
+        <div class="module-card preview-card">
+          <h3>Preview Feed</h3>
+          <img id="preview-gif" alt="Module preview GIF" loading="lazy" />
+        </div>
+      </section>
+    </template>
+
+    <template id="tactical-runner-template">
+      <section class="state-grid single-column">
+        <div class="module-card runner-grid">
+          <header class="runner-header">
+            <h3>Tactical Runner</h3>
+            <span class="runner-chip">headful-ready</span>
+          </header>
+          <button id="launch-engine" class="primary-action">LAUNCH HEADFUL ENGINE</button>
+          <section id="scrape-shell" class="scrape-shell" hidden>
+            <header class="scrape-shell-header">
+              <p>In-App Target Session</p>
+              <button id="rearm-tagger" class="secondary-action">REARM TAGGER</button>
+            </header>
+            <webview
+              id="scrape-webview"
+              class="scrape-webview"
+              src="https://testghost.com"
+              partition="persist:ghostops-scrape"
+              allowpopups="false"
+            ></webview>
+          </section>
+          <div class="terminal-kicker" style="font-size: 0.65rem; color: #76ab72; text-transform: uppercase; letter-spacing: 0.08em; margin-top: auto; padding-bottom: 4px;">Live Telemetry Feed</div>
+          <pre id="terminal-log" class="terminal-log"></pre>
+        </div>
+      </section>
+    </template>
+
+    <template id="docs-template">
+      <article class="docs-view">
+        <h3>System Documentation</h3>
+        <p>GHOSTops Terminal is a context aware launcher and status wall for operational modules under <code>../Toolbelt</code>.</p>
+        <h4>Runtime Flow</h4>
+        <ul>
+          <li>Sidebar selects a module route</li>
+          <li>Renderer polls tool presence through <code>window.ghostOps.checkTool</code></li>
+          <li>Stage hydrates state A, B, or C based on route and filesystem response</li>
+        </ul>
+        <h4>Toolbelt Contract</h4>
+        <pre><code>Toolbelt/
+  SCRAPEtag/
+    index.js
+  TESTops/
+    index.js
+  MOCKops/
+    index.js
+  TRACEops/
+    index.js</code></pre>
+        <h4>Security Notes</h4>
+        <ul>
+          <li>Renderer uses preload scoped APIs only</li>
+          <li>Main process validates tool names before touching filesystem</li>
+          <li>No direct Node access in browser context</li>
+        </ul>
+      </article>
+    </template>
+
+    <script src="renderer.js" defer></script>
+  </body>
+</html>

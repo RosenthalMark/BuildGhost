@@ -1,0 +1,492 @@
+const stageTitle = document.getElementById('stage-title')
+const stageChip = document.getElementById('stage-chip')
+const stageContent = document.getElementById('stage-content')
+const pollingStatus = document.getElementById('polling-status')
+const selectedStatus = document.getElementById('selected-status')
+const toolHealth = document.getElementById('tool-health')
+const navItems = Array.from(document.querySelectorAll('.nav-item'))
+const introVid = document.getElementById('intro-vid')
+const staticLogo = document.getElementById('static-logo')
+
+if (introVid && staticLogo) {
+  const showStaticLogo = () => {
+    introVid.style.display = 'none'
+    staticLogo.style.display = 'block'
+  }
+
+  introVid.addEventListener('ended', () => {
+    showStaticLogo()
+  })
+
+  introVid.addEventListener('error', () => {
+    showStaticLogo()
+  })
+
+  introVid.addEventListener('abort', () => {
+    showStaticLogo()
+  })
+}
+
+const POLL_INTERVAL_MS = 2500
+let activeRoute = 'tool'
+let activeTool = 'SCRAPEtag'
+let pollTimer = null
+let terminalLogNode = null
+let unsubscribeToolLog = null
+let currentStageSignature = ''
+const terminalLogBuffer = []
+const MAX_TERMINAL_LINES = 500
+const toolCache = new Map()
+
+const toolConfig = {
+  SCRAPEtag: {
+    preview: 'assets/previews/scrapetag.gif',
+    description: 'SCRAPEtag module was not discovered in Toolbelt. Initialize to scaffold runtime files and bridge contracts.',
+    expectedPath: '../Toolbelt/SCRAPEtag/index.js'
+  },
+  TESTops: {
+    preview: 'assets/previews/testops.gif',
+    description: 'TESTops harness is absent from Toolbelt. Initialize to create assertion runner wiring and fixtures.',
+    expectedPath: '../Toolbelt/TESTops/index.js'
+  },
+  MOCKops: {
+    preview: 'assets/previews/mockops.gif',
+    description: 'MOCKops payload engine is not present. Initialize to install synthetic data adapters and scenario mappers.',
+    expectedPath: '../Toolbelt/MOCKops/index.js'
+  },
+  TRACEops: {
+    preview: 'assets/previews/traceops.gif',
+    description: 'TRACEops telemetry chain is missing. Initialize to wire probes and event timeline emitters.',
+    expectedPath: '../Toolbelt/TRACEops/index.js'
+  }
+}
+
+function isoStamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19)
+}
+
+function setNavSelection() {
+  navItems.forEach((item) => {
+    const match = item.dataset.route === activeRoute && item.dataset.tool === activeTool
+    item.classList.toggle('active', match)
+  })
+}
+
+function setStageIdentity() {
+  stageTitle.textContent = activeRoute === 'docs' ? 'SYSTEM DOCS' : activeTool
+  selectedStatus.textContent = activeRoute === 'docs' ? 'system' : activeTool.toLowerCase()
+}
+
+function setChip(text) {
+  stageChip.textContent = text
+}
+
+function setPollingStatus(text, isHealthy) {
+  pollingStatus.textContent = text
+  toolHealth.textContent = text
+  toolHealth.classList.toggle('status-good', Boolean(isHealthy))
+  toolHealth.classList.toggle('status-bad', !isHealthy)
+}
+
+function cloneTemplate(id) {
+  return document.getElementById(id).content.cloneNode(true)
+}
+
+function mountContent(node) {
+  stageContent.classList.remove('fade-swap')
+  stageContent.innerHTML = ''
+  stageContent.appendChild(node)
+  requestAnimationFrame(() => stageContent.classList.add('fade-swap'))
+}
+
+function appendTerminalLine(text) {
+  const normalized = String(text || '')
+    .split('\n')
+    .filter((line) => line.length > 0)
+
+  normalized.forEach((line) => {
+    terminalLogBuffer.push(line)
+  })
+
+  if (terminalLogBuffer.length > MAX_TERMINAL_LINES) {
+    terminalLogBuffer.splice(0, terminalLogBuffer.length - MAX_TERMINAL_LINES)
+  }
+
+  if (!terminalLogNode) {
+    return
+  }
+
+  terminalLogNode.textContent = terminalLogBuffer.join('\n')
+  terminalLogNode.scrollTop = terminalLogNode.scrollHeight
+}
+
+async function armScrapeTagger(webview) {
+  const injectionResult = await webview.executeJavaScript(
+    `
+      (() => {
+        const styleId = 'ghost-tag-style'
+        if (!document.getElementById(styleId)) {
+          const style = document.createElement('style')
+          style.id = styleId
+          style.textContent = [
+            '.ghost-tag {',
+            'position: absolute;',
+            'z-index: 2147483647;',
+            'background: #fff;',
+            'color: #000;',
+            'border: 4px solid #39ff14;',
+            'border-radius: 8px;',
+            'font-family: monospace;',
+            'font-size: 12px;',
+            'line-height: 1.2;',
+            'box-shadow: 0 0 10px rgba(57, 255, 20, 0.65);',
+            'padding: 8px 28px 8px 8px;',
+            '}',
+            '.ghost-tag button {',
+            'position: absolute;',
+            'top: 3px;',
+            'right: 3px;',
+            'border: 0;',
+            'border-radius: 3px;',
+            'background: #d90429;',
+            'color: #fff;',
+            'width: 16px;',
+            'height: 16px;',
+            'line-height: 16px;',
+            'padding: 0;',
+            'font-size: 10px;',
+            'cursor: pointer;',
+            '}'
+          ].join('')
+          document.head.appendChild(style)
+        }
+
+        if (window.__ghostTaggerClickHandler) {
+          document.removeEventListener('click', window.__ghostTaggerClickHandler, true)
+        }
+
+        const computeSelector = (node) => {
+          if (!node || node.nodeType !== 1) {
+            return ''
+          }
+          if (node.id) {
+            return '#' + node.id
+          }
+
+          const parts = []
+          let current = node
+          while (current && current.nodeType === 1 && current !== document.body) {
+            let part = current.tagName.toLowerCase()
+            const classes = Array.from(current.classList).filter(Boolean)
+            if (classes.length > 0) {
+              part += '.' + classes[0]
+            } else if (current.parentElement) {
+              const siblings = Array.from(current.parentElement.children).filter((el) => el.tagName === current.tagName)
+              if (siblings.length > 1) {
+                part += ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')'
+              }
+            }
+            parts.unshift(part)
+            current = current.parentElement
+          }
+          return parts.join(' > ')
+        }
+
+        const clickHandler = (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          event.stopImmediatePropagation()
+
+          const target = event.target
+          if (!(target instanceof Element)) {
+            return
+          }
+
+          if (target.closest && target.closest('.ghost-tag')) {
+            return
+          }
+
+          const name = window.prompt('Tag Name')
+          if (!name) {
+            console.log('[SCRAPEtag] prompt canceled')
+            return
+          }
+
+          const rect = target.getBoundingClientRect()
+          const tag = document.createElement('div')
+          tag.className = 'ghost-tag'
+          tag.textContent = name
+          tag.style.left = (rect.left + window.scrollX) + 'px'
+          tag.style.top = (rect.top + window.scrollY) + 'px'
+
+          const close = document.createElement('button')
+          close.type = 'button'
+          close.textContent = 'X'
+          close.addEventListener('click', (closeEvent) => {
+            closeEvent.preventDefault()
+            closeEvent.stopPropagation()
+            tag.remove()
+          })
+
+          tag.appendChild(close)
+          document.body.appendChild(tag)
+
+          const selector = computeSelector(target)
+          console.log('[SCRAPEtag] selector=' + selector + ' | tag=' + name)
+        }
+
+        window.__ghostTaggerClickHandler = clickHandler
+        document.addEventListener('click', clickHandler, true)
+        console.log('[SCRAPEtag] in-app tagger armed')
+        return 'armed'
+      })()
+    `,
+    true
+  )
+
+  return injectionResult
+}
+
+function bindScrapeWebview(webview) {
+  if (!webview || webview.dataset.bound === '1') {
+    return
+  }
+
+  webview.dataset.bound = '1'
+
+  webview.addEventListener('did-start-loading', () => {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading started`)
+  })
+
+  webview.addEventListener('did-stop-loading', () => {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading complete`)
+  })
+
+  webview.addEventListener('did-fail-load', (event) => {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview load failed: ${event.errorDescription}`)
+  })
+
+  webview.addEventListener('console-message', (event) => {
+    appendTerminalLine(`[${isoStamp()}] ${event.message}`)
+  })
+
+  webview.addEventListener('dom-ready', async () => {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview ready`)
+    try {
+      await armScrapeTagger(webview)
+      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] click an element to tag`)
+    } catch (error) {
+      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] injector failed: ${error.message}`)
+    }
+  })
+}
+
+function launchScrapeSession() {
+  const scrapeShell = document.getElementById('scrape-shell')
+  const webview = document.getElementById('scrape-webview')
+  const rearmBtn = document.getElementById('rearm-tagger')
+
+  if (!scrapeShell || !webview) {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] in-app webview container unavailable`)
+    return
+  }
+
+  scrapeShell.hidden = false
+  bindScrapeWebview(webview)
+  appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] launching in-app session: https://testghost.com`)
+
+  if (webview.getURL && !webview.getURL()) {
+    webview.src = 'https://testghost.com'
+  } else {
+    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] session already loaded`)
+  }
+
+  if (rearmBtn && rearmBtn.dataset.bound !== '1') {
+    rearmBtn.dataset.bound = '1'
+    rearmBtn.addEventListener('click', async () => {
+      try {
+        await armScrapeTagger(webview)
+        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] tagger rearmed`)
+      } catch (error) {
+        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] rearm failed: ${error.message}`)
+      }
+    })
+  }
+}
+
+function attachPreviewFallback(img) {
+  img.addEventListener('error', () => {
+    img.alt = 'Preview GIF unavailable on disk'
+    img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23080909'/%3E%3Ctext x='50%25' y='50%25' fill='%2339FF14' font-size='26' font-family='monospace' dominant-baseline='middle' text-anchor='middle'%3EPREVIEW OFFLINE%3C/text%3E%3C/svg%3E"
+  })
+}
+
+async function renderMissingState(toolName, toolInfo) {
+  const cfg = toolConfig[toolName]
+  const view = cloneTemplate('module-missing-template')
+  const description = view.querySelector('#missing-description')
+  const missingPath = view.querySelector('#missing-path')
+  const preview = view.querySelector('#preview-gif')
+  const initializeBtn = view.querySelector('#initialize-module')
+
+  description.textContent = cfg.description
+  missingPath.textContent = toolInfo.expectedPath || cfg.expectedPath
+  preview.src = cfg.preview
+  attachPreviewFallback(preview)
+
+  initializeBtn.addEventListener('click', async () => {
+    initializeBtn.disabled = true
+    initializeBtn.textContent = 'INITIALIZING MODULE'
+    const result = await window.ghostOps.initializeTool(toolName)
+    if (result.ok) {
+      setPollingStatus('module initialized', true)
+    } else {
+      setPollingStatus('init failed', false)
+      initializeBtn.disabled = false
+      initializeBtn.textContent = 'INITIALIZE MODULE'
+    }
+    await refreshActiveStage()
+  })
+
+  setChip('state-a')
+  mountContent(view)
+  terminalLogNode = null
+}
+
+function renderRunnerState(toolName, toolInfo) {
+  const view = cloneTemplate('tactical-runner-template')
+  const launchBtn = view.querySelector('#launch-engine')
+  const scrapeShell = view.querySelector('#scrape-shell')
+  const runnerChip = view.querySelector('.runner-chip')
+
+  if (terminalLogBuffer.length === 0) {
+    appendTerminalLine(`[${isoStamp()}] ${toolName} entrypoint discovered`)
+    appendTerminalLine(`[${isoStamp()}] runner idle`)
+    appendTerminalLine(`[${isoStamp()}] note: SCRAPEtag now runs inside the app window`)
+  }
+
+  if (toolName === 'SCRAPEtag') {
+    launchBtn.textContent = 'LAUNCH IN-APP SCRAPE'
+    runnerChip.textContent = 'in-app-ready'
+  } else {
+    launchBtn.textContent = 'LAUNCH HEADFUL ENGINE'
+    runnerChip.textContent = 'headful-ready'
+    scrapeShell.remove()
+  }
+
+  launchBtn.addEventListener('click', async () => {
+    appendTerminalLine(`[${isoStamp()}] launch requested for ${toolName} at ${toolInfo.entryPath}`)
+    if (toolName === 'SCRAPEtag') {
+      launchScrapeSession()
+    } else {
+      window.ghostOps.launchTool(toolName)
+    }
+  })
+
+  setChip('state-b')
+  mountContent(view)
+  terminalLogNode = document.getElementById('terminal-log')
+  terminalLogNode.textContent = terminalLogBuffer.join('\n')
+  terminalLogNode.scrollTop = terminalLogNode.scrollHeight
+}
+
+function renderDocsState() {
+  const view = cloneTemplate('docs-template')
+  setChip('state-c')
+  setPollingStatus('documentation mode', true)
+  mountContent(view)
+  terminalLogNode = null
+}
+
+async function pollTool(toolName) {
+  const result = await window.ghostOps.checkTool(toolName)
+  toolCache.set(toolName, result)
+  return result
+}
+
+async function refreshActiveStage() {
+  setStageIdentity()
+
+  if (activeRoute === 'docs') {
+    if (currentStageSignature !== 'docs') {
+      renderDocsState()
+      currentStageSignature = 'docs'
+    }
+    return
+  }
+
+  setPollingStatus('polling filesystem', true)
+
+  try {
+    const toolInfo = await pollTool(activeTool)
+    const isFound = Boolean(toolInfo.found)
+    setPollingStatus(isFound ? 'module online' : 'module missing', isFound)
+
+    if (isFound) {
+      const signature = `runner:${activeTool}`
+      if (currentStageSignature !== signature) {
+        renderRunnerState(activeTool, toolInfo)
+        currentStageSignature = signature
+      }
+    } else {
+      const signature = `missing:${activeTool}`
+      if (currentStageSignature !== signature) {
+        await renderMissingState(activeTool, toolInfo)
+        currentStageSignature = signature
+      }
+    }
+  } catch (error) {
+    setChip('error')
+    setPollingStatus('bridge error', false)
+    stageContent.textContent = `IPC failure while checking ${activeTool}: ${error.message}`
+    currentStageSignature = 'error'
+  }
+}
+
+function startPollingLoop() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+  }
+
+  if (activeRoute === 'docs') {
+    return
+  }
+
+  pollTimer = setInterval(() => {
+    refreshActiveStage()
+  }, POLL_INTERVAL_MS)
+}
+
+function bindNavigation() {
+  navItems.forEach((item) => {
+    item.addEventListener('click', () => {
+      activeRoute = item.dataset.route
+      activeTool = item.dataset.tool
+      currentStageSignature = ''
+      appendTerminalLine(`[${isoStamp()}] route changed: ${activeRoute}/${activeTool}`)
+      setNavSelection()
+      refreshActiveStage()
+      startPollingLoop()
+    })
+  })
+}
+
+function bindToolLogs() {
+  if (unsubscribeToolLog || !window.ghostOps.onToolLog) {
+    return
+  }
+
+  unsubscribeToolLog = window.ghostOps.onToolLog((line) => {
+    appendTerminalLine(line)
+  })
+}
+
+async function boot() {
+  bindToolLogs()
+  bindNavigation()
+  setNavSelection()
+  await refreshActiveStage()
+  startPollingLoop()
+}
+
+boot()
