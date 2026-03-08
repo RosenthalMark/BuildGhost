@@ -18,45 +18,26 @@
         </header>
 
         <nav class="tool-nav" aria-label="Tool Navigation">
-          <div class="sidebar-label" style="font-size: 0.65rem; color: #b8ff5a; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px; border-bottom: 1px solid rgb(184 255 90 / 0.15); padding-bottom: 6px;">Operational Modules</div>
-          <button class="nav-item active" data-route="tool" data-tool="SCRAPEtag">
+          <div class="sidebar-label" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px; border-bottom: 1px solid rgb(184 255 90 / 0.15); padding-bottom: 6px;">Operational Modules</div>
+          <button class="nav-item module-slot active" data-route="tool" data-tool="SCRAPEtag">
             <span class="nav-logo-wrap">
               <img class="nav-tool-logo" src="../Toolbelt/SCRAPEtag/assets/SCRAPEtag-logo.png" alt="SCRAPEtag" />
-              <span class="tool-live-status" style="color: #b8ff5a; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+              <span class="tool-live-dot" aria-hidden="true"></span>
             </span>
             <span class="nav-meta">Recon Harvesting</span>
           </button>
-          <button class="nav-item" data-route="tool" data-tool="TESTops">
+          <button class="nav-item module-slot" data-route="tool" data-tool="GHOSTstub">
             <span class="nav-logo-wrap">
-              <span class="nav-name">TESTops</span>
-              <span class="tool-live-status" style="color: #b8ff5a; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
-            </span>
-            <span class="nav-meta">Scenario Firing</span>
-          </button>
-          <button class="nav-item" data-route="tool" data-tool="MOCKops">
-            <span class="nav-logo-wrap">
-              <span class="nav-name">MOCKops</span>
-              <span class="tool-live-status" style="color: #b8ff5a; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
+              <img class="nav-tool-logo" src="../Toolbelt/GHOSTstub/assets/ghostStub-logo.png" alt="GHOSTstub" />
+              <span class="tool-live-dot" aria-hidden="true"></span>
             </span>
             <span class="nav-meta">Payload Shaping</span>
           </button>
-          <button class="nav-item" data-route="tool" data-tool="TRACEops">
-            <span class="nav-logo-wrap">
-              <span class="nav-name">TRACEops</span>
-              <span class="tool-live-status" style="color: #b8ff5a; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
-            </span>
-            <span class="nav-meta">Signal Tracing</span>
-          </button>
-          <button class="nav-item nav-docs" data-route="docs" data-tool="SYSTEM">
-            <span class="nav-logo-wrap">
-              <span class="nav-name">SYSTEM DOCS</span>
-              <span class="tool-live-status" style="color: #b8ff5a; font-size: 0.7rem; display: block; margin-top: 4px;">[ IDLE ]</span>
-            </span>
-            <span class="nav-meta">Protocol Registry</span>
-          </button>
+          <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
+          <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           <div class="sidebar-fillers" style="opacity: 0.4; margin-top: 10px;">
-            <div class="nav-item" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
-            <div class="nav-item" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
+            <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
+            <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           </div>
           <div class="sidebar-anchors" style="margin-top: auto; padding-top: 15px; border-top: 1px solid #b8ff5a; display: flex; flex-direction: column; gap: 8px;">
             <button class="nav-item" id="nav-settings" data-route="config">
@@ -67,6 +48,11 @@
             <button class="nav-item" id="nav-signin" data-route="auth">
               <span class="nav-logo-wrap">
                 <span class="nav-name" style="margin: 0 auto; color: #b8ff5a;">[ SIGN IN ]</span>
+              </span>
+            </button>
+            <button class="nav-item nav-docs" data-route="docs" data-tool="SYSTEM">
+              <span class="nav-logo-wrap">
+                <span class="nav-name">SYSTEM DOCS</span>
               </span>
             </button>
           </div>
@@ -178,11 +164,7 @@
         <pre><code>Toolbelt/
   SCRAPEtag/
     index.js
-  TESTops/
-    index.js
-  MOCKops/
-    index.js
-  TRACEops/
+  GHOSTstub/
     index.js</code></pre>
         <h4>Security Notes</h4>
         <ul>
@@ -193,6 +175,6 @@
       </article>
     </template>
 
-    <script src="renderer.js" defer></script>
+    <script type="module" src="renderer.js"></script>
   </body>
 </html>

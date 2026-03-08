@@ -1,3 +1,5 @@
+import { playBootSequence } from './src/services/bootManager.js'
+
 const stageTitle = document.getElementById('stage-title')
 const stageChip = document.getElementById('stage-chip')
 const stageContent = document.getElementById('stage-content')
@@ -44,20 +46,10 @@ const toolConfig = {
     description: 'SCRAPEtag module was not discovered in Toolbelt. Initialize to scaffold runtime files and bridge contracts.',
     expectedPath: '../Toolbelt/SCRAPEtag/index.js'
   },
-  TESTops: {
-    preview: 'assets/previews/testops.gif',
-    description: 'TESTops harness is absent from Toolbelt. Initialize to create assertion runner wiring and fixtures.',
-    expectedPath: '../Toolbelt/TESTops/index.js'
-  },
-  MOCKops: {
+  GHOSTstub: {
     preview: 'assets/previews/mockops.gif',
-    description: 'MOCKops payload engine is not present. Initialize to install synthetic data adapters and scenario mappers.',
-    expectedPath: '../Toolbelt/MOCKops/index.js'
-  },
-  TRACEops: {
-    preview: 'assets/previews/traceops.gif',
-    description: 'TRACEops telemetry chain is missing. Initialize to wire probes and event timeline emitters.',
-    expectedPath: '../Toolbelt/TRACEops/index.js'
+    description: 'GHOSTstub payload engine is not present. Initialize to install synthetic data adapters and scenario mappers.',
+    expectedPath: '../Toolbelt/GHOSTstub/index.js'
   }
 }
 
@@ -105,7 +97,11 @@ function appendTerminalLine(text) {
     .filter((line) => line.length > 0)
 
   normalized.forEach((line) => {
-    terminalLogBuffer.push(line)
+    // Escape raw HTML to prevent breaking the pre tag
+    const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Wrap the [YYYY-MM-DD HH:MM:SS] timestamp in the app's native green
+    const formattedLine = safeLine.replace(/^(\[[0-9\- :]+\])/, '<span style="color: var(--line-hot);">$1</span>')
+    terminalLogBuffer.push(formattedLine)
   })
 
   if (terminalLogBuffer.length > MAX_TERMINAL_LINES) {
@@ -116,7 +112,7 @@ function appendTerminalLine(text) {
     return
   }
 
-  terminalLogNode.textContent = terminalLogBuffer.join('\n')
+  terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
   terminalLogNode.scrollTop = terminalLogNode.scrollHeight
 }
 
@@ -198,41 +194,88 @@ async function armScrapeTagger(webview) {
           event.stopImmediatePropagation()
 
           const target = event.target
-          if (!(target instanceof Element)) {
-            return
+          if (!(target instanceof Element)) return
+
+          // Ignore clicks on our own injected tags or modal
+          if (target.closest && (target.closest('.ghost-tag') || target.closest('#ghost-prompt-modal'))) return
+
+          // Prevent multiple modals
+          if (document.getElementById('ghost-prompt-modal')) return
+
+          // Build Tactical Custom Prompt Modal
+          const modal = document.createElement('div')
+          modal.id = 'ghost-prompt-modal'
+          modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#050606;border:1px solid #ff1493;padding:20px;z-index:2147483647;border-radius:8px;box-shadow:0 0 30px rgba(255,20,147,0.2), inset 0 0 10px rgba(255,20,147,0.1);color:#b8ff5a;font-family:monospace;display:flex;flex-direction:column;gap:12px;min-width:300px;'
+
+          const label = document.createElement('label')
+          label.textContent = '> INPUT TARGET SELECTOR ALIAS:'
+          label.style.fontSize = '12px'
+          label.style.letterSpacing = '0.08em'
+
+          const input = document.createElement('input')
+          input.type = 'text'
+          input.style.cssText = 'background:#000;border:1px solid #b8ff5a;color:#b8ff5a;padding:10px;font-family:monospace;outline:none;font-size:14px;border-radius:4px;'
+
+          const btnWrap = document.createElement('div')
+          btnWrap.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:8px;'
+
+          const cancelBtn = document.createElement('button')
+          cancelBtn.textContent = 'CANCEL'
+          cancelBtn.style.cssText = 'background:transparent;border:1px solid #555;color:#aaa;padding:8px 16px;cursor:pointer;font-family:monospace;border-radius:4px;font-weight:bold;'
+
+          const saveBtn = document.createElement('button')
+          saveBtn.textContent = 'TAG TARGET'
+          saveBtn.style.cssText = 'background:rgba(184,255,90,0.1);border:1px solid #b8ff5a;color:#b8ff5a;padding:8px 16px;cursor:pointer;font-family:monospace;border-radius:4px;font-weight:bold;'
+
+          btnWrap.appendChild(cancelBtn)
+          btnWrap.appendChild(saveBtn)
+          modal.appendChild(label)
+          modal.appendChild(input)
+          modal.appendChild(btnWrap)
+          document.body.appendChild(modal)
+
+          input.focus()
+
+          const cleanup = () => modal.remove()
+          cancelBtn.onclick = cleanup
+
+          const finishTagging = () => {
+            const name = input.value.trim()
+            cleanup()
+
+            if (!name) {
+              console.log('[SCRAPEtag] tagger aborted')
+              return
+            }
+
+            const rect = target.getBoundingClientRect()
+            const tag = document.createElement('div')
+            tag.className = 'ghost-tag'
+            tag.textContent = name
+            tag.style.left = (rect.left + window.scrollX) + 'px'
+            tag.style.top = (rect.top + window.scrollY) + 'px'
+
+            const close = document.createElement('button')
+            close.type = 'button'
+            close.textContent = 'X'
+            close.addEventListener('click', (closeEvent) => {
+              closeEvent.preventDefault()
+              closeEvent.stopPropagation()
+              tag.remove()
+            })
+
+            tag.appendChild(close)
+            document.body.appendChild(tag)
+
+            const selector = computeSelector(target)
+            console.log('[SCRAPEtag] selector=' + selector + ' | tag=' + name)
           }
 
-          if (target.closest && target.closest('.ghost-tag')) {
-            return
+          saveBtn.onclick = finishTagging
+          input.onkeydown = (e) => {
+            if (e.key === 'Enter') finishTagging()
+            if (e.key === 'Escape') cleanup()
           }
-
-          const name = window.prompt('Tag Name')
-          if (!name) {
-            console.log('[SCRAPEtag] prompt canceled')
-            return
-          }
-
-          const rect = target.getBoundingClientRect()
-          const tag = document.createElement('div')
-          tag.className = 'ghost-tag'
-          tag.textContent = name
-          tag.style.left = (rect.left + window.scrollX) + 'px'
-          tag.style.top = (rect.top + window.scrollY) + 'px'
-
-          const close = document.createElement('button')
-          close.type = 'button'
-          close.textContent = 'X'
-          close.addEventListener('click', (closeEvent) => {
-            closeEvent.preventDefault()
-            closeEvent.stopPropagation()
-            tag.remove()
-          })
-
-          tag.appendChild(close)
-          document.body.appendChild(tag)
-
-          const selector = computeSelector(target)
-          console.log('[SCRAPEtag] selector=' + selector + ' | tag=' + name)
         }
 
         window.__ghostTaggerClickHandler = clickHandler
@@ -386,7 +429,7 @@ function renderRunnerState(toolName, toolInfo) {
   setChip('state-b')
   mountContent(view)
   terminalLogNode = document.getElementById('terminal-log')
-  terminalLogNode.textContent = terminalLogBuffer.join('\n')
+  terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
   terminalLogNode.scrollTop = terminalLogNode.scrollHeight
 }
 
@@ -460,13 +503,29 @@ function startPollingLoop() {
 function bindNavigation() {
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
-      activeRoute = item.dataset.route
-      activeTool = item.dataset.tool
-      currentStageSignature = ''
-      appendTerminalLine(`[${isoStamp()}] route changed: ${activeRoute}/${activeTool}`)
-      setNavSelection()
-      refreshActiveStage()
-      startPollingLoop()
+      const nextRoute = item.dataset.route
+      const nextTool = item.dataset.tool
+
+      if (!nextRoute || (nextRoute !== 'tool' && nextRoute !== 'docs')) {
+        return
+      }
+
+      const continueNav = () => {
+        activeRoute = nextRoute
+        activeTool = nextTool
+        currentStageSignature = ''
+        appendTerminalLine(`[${isoStamp()}] route changed: ${activeRoute}/${activeTool}`)
+        setNavSelection()
+        refreshActiveStage()
+        startPollingLoop()
+      }
+
+      if (nextRoute === 'tool') {
+        playBootSequence(nextTool, stageContent, continueNav)
+        return
+      }
+
+      continueNav()
     })
   })
 }

@@ -106,7 +106,12 @@ body {
   gap: 8px;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
+}
+
+.module-slot {
+  min-height: 72px;
 }
 
 .nav-item {
@@ -124,21 +129,21 @@ body {
   padding: 4px;
   min-height: 65px;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .nav-item:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-1px);
   border-color: var(--line-hot);
-  box-shadow: 0 4px 15px rgb(184 255 90 / 0.15), inset 0 0 10px rgb(184 255 90 / 0.05);
+  box-shadow: 0 2px 8px rgb(184 255 90 / 0.12), inset 0 0 8px rgb(184 255 90 / 0.05);
   background: linear-gradient(180deg, rgb(15 22 18 / 0.98), rgb(10 14 12 / 0.98));
 }
 
 .nav-item.active {
   border-color: var(--line-hot);
-  box-shadow: inset 0 0 0 1px rgb(184 255 90 / 0.3), 0 0 20px rgb(184 255 90 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(184 255 90 / 0.28), 0 0 10px rgb(184 255 90 / 0.1);
   background: linear-gradient(180deg, rgb(14 24 14 / 0.98), rgb(8 13 9 / 0.98));
 }
 
@@ -156,6 +161,17 @@ body {
   height: 100%;
 }
 
+.module-slot:not(.future-placeholder) {
+  padding: 0;
+}
+
+.module-slot:not(.future-placeholder) .nav-logo-wrap {
+  position: relative;
+  min-height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .nav-tool-logo {
   margin: 0 auto;
   width: 95%;
@@ -166,9 +182,50 @@ body {
   transition: transform 0.3s ease, filter 0.3s ease;
 }
 
+.module-slot:not(.future-placeholder) .nav-tool-logo {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+}
+
 .nav-item:hover .nav-tool-logo {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 8px rgb(184 255 90 / 0.6));
+  transform: scale(1);
+  filter: drop-shadow(0 0 2px rgb(184 255 90 / 0.25));
+}
+
+.future-placeholder {
+  cursor: default;
+}
+
+.future-placeholder:hover {
+  transform: none;
+  border-color: var(--line);
+  box-shadow: none;
+  background: linear-gradient(180deg, rgb(13 16 16 / 0.95), rgb(10 12 12 / 0.95));
+}
+
+.future-placeholder .nav-name {
+  color: #fff;
+}
+
+.tool-live-dot {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line-hot);
+  opacity: 0;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-item[data-route="tool"].active .tool-live-dot {
+  opacity: 1;
+  box-shadow: 0 0 8px rgb(184 255 90 / 0.9);
+  animation: liveDotPulse 1.6s ease-in-out infinite;
 }
 
 .tool-live-status {
@@ -607,6 +664,23 @@ body {
   }
 }
 
+@keyframes liveDotPulse {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 4px rgb(184 255 90 / 0.5);
+  }
+
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgb(184 255 90 / 0.95);
+  }
+
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 4px rgb(184 255 90 / 0.5);
+  }
+}
+
 @media (max-width: 1024px) {
   .hud-shell {
     grid-template-columns: 1fr;
@@ -627,3 +701,12 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Contrast Pass Overrides */
+.sidebar-label { color: #ffffff !important; }
+.kicker { color: #ffffff !important; }
+.runner-header h3 { color: #ffffff !important; }
+.scrape-shell-header p { color: #ffffff !important; }
+.stat-label { color: var(--line-hot) !important; } /* Keeps POLLING/SELECTED green */
+.stat-value { color: #ffffff !important; } /* Turns the dynamic values white */
+.terminal-log { color: #ffffff !important; } /* Base terminal text is white */

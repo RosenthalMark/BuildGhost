@@ -4,7 +4,7 @@ const fs = require('fs')
 const { spawn } = require('child_process')
 
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
-const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'TESTops', 'MOCKops', 'TRACEops'])
+const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub'])
 let activeToolProcess = null
 
 function stopActiveToolProcess(sender) {
