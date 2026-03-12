@@ -32,6 +32,7 @@ if (introVid && staticLogo) {
 const POLL_INTERVAL_MS = 2500
 let activeRoute = 'tool'
 let activeTool = 'SCRAPEtag'
+let lastCapturedAlias = ''
 let pollTimer = null
 let terminalLogNode = null
 let unsubscribeToolLog = null
@@ -39,6 +40,9 @@ let currentStageSignature = ''
 const terminalLogBuffer = []
 const MAX_TERMINAL_LINES = 500
 const toolCache = new Map()
+let selectorCaptureBridgeBound = false
+let lastCaptureFingerprint = ''
+let lastCaptureAt = 0
 
 const toolConfig = {
   SCRAPEtag: {
@@ -65,7 +69,14 @@ function setNavSelection() {
 }
 
 function setStageIdentity() {
-  stageTitle.textContent = activeRoute === 'docs' ? 'SYSTEM DOCS' : activeTool
+  const isScrapeHud = activeRoute === 'tool' && activeTool === 'SCRAPEtag'
+  if (activeRoute === 'docs') {
+    stageTitle.textContent = 'SYSTEM DOCS'
+  } else if (isScrapeHud && lastCapturedAlias) {
+    stageTitle.textContent = `SCRAPEtag :: ${lastCapturedAlias}`
+  } else {
+    stageTitle.textContent = activeTool
+  }
   selectedStatus.textContent = activeRoute === 'docs' ? 'system' : activeTool.toLowerCase()
 }
 
@@ -97,10 +108,13 @@ function appendTerminalLine(text) {
     .filter((line) => line.length > 0)
 
   normalized.forEach((line) => {
-    // Escape raw HTML to prevent breaking the pre tag
     const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Wrap the [YYYY-MM-DD HH:MM:SS] timestamp in the app's native green
-    const formattedLine = safeLine.replace(/^(\[[0-9\- :]+\])/, '<span style="color: var(--line-hot);">$1</span>')
+    let formattedLine = safeLine
+    if (safeLine.includes('[CAPTURED]')) {
+      formattedLine = `<span style="color: var(--line-hot);">${safeLine}</span>`
+    } else {
+      formattedLine = safeLine.replace(/^(\[[0-9\- :]+\])/, '<span style="color: var(--line-hot);">$1</span>')
+    }
     terminalLogBuffer.push(formattedLine)
   })
 
@@ -114,6 +128,77 @@ function appendTerminalLine(text) {
 
   terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
   terminalLogNode.scrollTop = terminalLogNode.scrollHeight
+}
+
+function parseScrapeCaptureMessage(message) {
+  if (typeof message !== 'string') {
+    return null
+  }
+
+  const marker = '[SCRAPEtag:capture]'
+  if (!message.startsWith(marker)) {
+    return null
+  }
+
+  try {
+    const payload = JSON.parse(message.slice(marker.length))
+    return normalizeScrapeCapture(payload)
+  } catch {
+    return null
+  }
+}
+
+function normalizeScrapeCapture(payload) {
+  const alias = typeof payload?.alias === 'string' ? payload.alias.trim() : ''
+  const selector = typeof payload?.selector === 'string' ? payload.selector.trim() : ''
+  const toolName = typeof payload?.toolName === 'string' && payload.toolName.trim() ? payload.toolName.trim() : 'SCRAPEtag'
+  const timestamp = typeof payload?.timestamp === 'string' && payload.timestamp.trim() ? payload.timestamp.trim() : new Date().toISOString()
+
+  if (!alias || !selector) {
+    return null
+  }
+
+  return { alias, selector, toolName, timestamp }
+}
+
+function bindSelectorCaptureBridge() {
+  if (selectorCaptureBridgeBound) {
+    return
+  }
+
+  selectorCaptureBridgeBound = true
+  window.addEventListener('message', (event) => {
+    const message = event?.data
+    if (!message || message.type !== 'selector-captured') {
+      return
+    }
+
+    const capture = normalizeScrapeCapture(message.payload)
+    if (!capture) {
+      return
+    }
+
+    handleScrapeCapture(capture)
+  })
+}
+
+function handleScrapeCapture(capture) {
+  const normalizedCapture = normalizeScrapeCapture(capture)
+  if (!normalizedCapture) {
+    return
+  }
+
+  const fingerprint = `${normalizedCapture.alias}|${normalizedCapture.selector}|${normalizedCapture.timestamp}`
+  const now = Date.now()
+  if (fingerprint === lastCaptureFingerprint && now - lastCaptureAt < 800) {
+    return
+  }
+
+  lastCaptureFingerprint = fingerprint
+  lastCaptureAt = now
+  lastCapturedAlias = normalizedCapture.alias
+  setStageIdentity()
+  window.ghostOps.captureSelector?.(normalizedCapture)
 }
 
 async function armScrapeTagger(webview) {
@@ -130,7 +215,7 @@ async function armScrapeTagger(webview) {
             'z-index: 2147483647;',
             'background: #fff;',
             'color: #000;',
-            'border: 4px solid #b8ff5a;',
+            'border: 4px solid var(--accent-primary, rgb(184, 255, 90));',
             'border-radius: 8px;',
             'font-family: monospace;',
             'font-size: 12px;',
@@ -159,6 +244,21 @@ async function armScrapeTagger(webview) {
 
         if (window.__ghostTaggerClickHandler) {
           document.removeEventListener('click', window.__ghostTaggerClickHandler, true)
+          window.__ghostTaggerClickHandler = null
+        }
+
+        const staleOverlay = document.getElementById('ghost-prompt-overlay')
+        if (staleOverlay) {
+          staleOverlay.remove()
+        }
+
+        const staleModal = document.getElementById('ghost-prompt-modal')
+        if (staleModal) {
+          staleModal.remove()
+        }
+
+        if (document.body) {
+          document.body.style.cursor = 'crosshair'
         }
 
         const computeSelector = (node) => {
@@ -189,23 +289,50 @@ async function armScrapeTagger(webview) {
         }
 
         const clickHandler = (event) => {
+          const target = event.target
+          if (!(target instanceof Element)) return
+
+          if (
+            target.closest &&
+            (target.closest('.ghost-tag') || target.closest('#ghost-prompt-modal') || target.closest('#ghost-prompt-overlay'))
+          ) {
+            return
+          }
+
+          if (document.getElementById('ghost-prompt-modal')) return
+
           event.preventDefault()
           event.stopPropagation()
           event.stopImmediatePropagation()
 
-          const target = event.target
-          if (!(target instanceof Element)) return
+          // ── RELEASE VALVE: cleanup function ──────────────────────────────
+          const releaseNavigation = () => {
+            if (window.__ghostTaggerClickHandler) {
+              document.removeEventListener('click', window.__ghostTaggerClickHandler, true)
+              window.__ghostTaggerClickHandler = null
+            }
+            if (document.body) {
+              document.body.style.cursor = ''
+            }
+          }
 
-          // Ignore clicks on our own injected tags or modal
-          if (target.closest && (target.closest('.ghost-tag') || target.closest('#ghost-prompt-modal'))) return
+          const cleanup = () => {
+            const m = document.getElementById('ghost-prompt-modal')
+            const o = document.getElementById('ghost-prompt-overlay')
+            if (m) m.remove()
+            if (o) o.remove()
+            releaseNavigation()
+          }
+          // ─────────────────────────────────────────────────────────────────
 
-          // Prevent multiple modals
-          if (document.getElementById('ghost-prompt-modal')) return
+          const overlay = document.createElement('div')
+          overlay.id = 'ghost-prompt-overlay'
+          // NOTE: NO pointer-events:none here — overlay is clickable as escape hatch
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:2147483646;'
 
-          // Build Tactical Custom Prompt Modal
           const modal = document.createElement('div')
           modal.id = 'ghost-prompt-modal'
-          modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#050606;border:1px solid #ff1493;padding:20px;z-index:2147483647;border-radius:8px;box-shadow:0 0 30px rgba(255,20,147,0.2), inset 0 0 10px rgba(255,20,147,0.1);color:#b8ff5a;font-family:monospace;display:flex;flex-direction:column;gap:12px;min-width:300px;'
+          modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#050606;border:1px solid var(--accent-primary, rgb(184, 255, 90));padding:20px;z-index:2147483647;border-radius:8px;box-shadow:0 0 20px rgba(184, 255, 90, 0.4), inset 0 0 10px rgba(184, 255, 90, 0.2);color:var(--accent-primary, rgb(184, 255, 90));font-family:monospace;display:flex;flex-direction:column;gap:12px;min-width:300px;'
 
           const label = document.createElement('label')
           label.textContent = '> INPUT TARGET SELECTOR ALIAS:'
@@ -214,7 +341,7 @@ async function armScrapeTagger(webview) {
 
           const input = document.createElement('input')
           input.type = 'text'
-          input.style.cssText = 'background:#000;border:1px solid #b8ff5a;color:#b8ff5a;padding:10px;font-family:monospace;outline:none;font-size:14px;border-radius:4px;'
+          input.style.cssText = 'background:#000;border:1px solid var(--accent-primary, rgb(184, 255, 90));color:var(--accent-primary, rgb(184, 255, 90));padding:10px;font-family:monospace;outline:none;font-size:14px;border-radius:4px;'
 
           const btnWrap = document.createElement('div')
           btnWrap.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:8px;'
@@ -225,25 +352,31 @@ async function armScrapeTagger(webview) {
 
           const saveBtn = document.createElement('button')
           saveBtn.textContent = 'TAG TARGET'
-          saveBtn.style.cssText = 'background:rgba(184,255,90,0.1);border:1px solid #b8ff5a;color:#b8ff5a;padding:8px 16px;cursor:pointer;font-family:monospace;border-radius:4px;font-weight:bold;'
+          saveBtn.style.cssText = 'background:rgba(184,255,90,0.1);border:1px solid var(--accent-primary, rgb(184, 255, 90));color:var(--accent-primary, rgb(184, 255, 90));padding:8px 16px;cursor:pointer;font-family:monospace;border-radius:4px;font-weight:bold;'
 
           btnWrap.appendChild(cancelBtn)
           btnWrap.appendChild(saveBtn)
           modal.appendChild(label)
           modal.appendChild(input)
           modal.appendChild(btnWrap)
+          document.body.appendChild(overlay)
           document.body.appendChild(modal)
 
           input.focus()
 
-          const cleanup = () => modal.remove()
-          cancelBtn.onclick = cleanup
+          // CANCEL button — full cleanup
+          cancelBtn.onclick = (cancelEvent) => {
+            cancelEvent.preventDefault()
+            cancelEvent.stopPropagation()
+            cleanup()
+            console.log('[SCRAPEtag] tagger cancelled')
+          }
 
           const finishTagging = () => {
             const name = input.value.trim()
-            cleanup()
 
             if (!name) {
+              cleanup()
               console.log('[SCRAPEtag] tagger aborted')
               return
             }
@@ -268,14 +401,61 @@ async function armScrapeTagger(webview) {
             document.body.appendChild(tag)
 
             const selector = computeSelector(target)
-            console.log('[SCRAPEtag] selector=' + selector + ' | tag=' + name)
+            cleanup()
+
+            const payload = {
+              alias: name,
+              selector,
+              toolName: 'SCRAPEtag',
+              timestamp: new Date().toISOString()
+            }
+
+            try {
+              window.parent.postMessage({ type: 'selector-captured', payload }, '*')
+            } catch {}
+
+            try {
+              window.postMessage({ type: 'selector-captured', payload }, '*')
+            } catch {}
+
+            console.log('[SCRAPEtag:capture]' + JSON.stringify(payload))
           }
 
-          saveBtn.onclick = finishTagging
-          input.onkeydown = (e) => {
-            if (e.key === 'Enter') finishTagging()
-            if (e.key === 'Escape') cleanup()
+          // TAG TARGET button
+          saveBtn.onclick = (saveEvent) => {
+            saveEvent.preventDefault()
+            saveEvent.stopPropagation()
+            finishTagging()
           }
+
+          // Keyboard: Enter to confirm, Escape to cancel
+          input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              finishTagging()
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              cleanup()
+            }
+          }
+
+          // ── CRITICAL: clicking the overlay backdrop dismisses the modal ──
+          overlay.addEventListener('click', (overlayEvent) => {
+            // Only dismiss if click is directly on overlay, not bubbling from modal
+            if (overlayEvent.target === overlay) {
+              overlayEvent.preventDefault()
+              overlayEvent.stopPropagation()
+              cleanup()
+              console.log('[SCRAPEtag] tagger dismissed via backdrop')
+            }
+          })
+          // ─────────────────────────────────────────────────────────────────
+
+          // Stop modal clicks from bubbling to overlay
+          modal.addEventListener('click', (modalEvent) => {
+            modalEvent.stopPropagation()
+          })
         }
 
         window.__ghostTaggerClickHandler = clickHandler
@@ -310,10 +490,16 @@ function bindScrapeWebview(webview) {
   })
 
   webview.addEventListener('console-message', (event) => {
+    const capture = parseScrapeCaptureMessage(event.message)
+    if (capture) {
+      handleScrapeCapture(capture)
+      return
+    }
     appendTerminalLine(`[${isoStamp()}] ${event.message}`)
   })
 
   webview.addEventListener('dom-ready', async () => {
+    bindSelectorCaptureBridge()
     appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview ready`)
     try {
       await armScrapeTagger(webview)
@@ -401,6 +587,7 @@ function renderRunnerState(toolName, toolInfo) {
   const launchBtn = view.querySelector('#launch-engine')
   const scrapeShell = view.querySelector('#scrape-shell')
   const runnerChip = view.querySelector('.runner-chip')
+  const domOverrideBtn = view.querySelector('#dom-override-trigger')
 
   if (terminalLogBuffer.length === 0) {
     appendTerminalLine(`[${isoStamp()}] ${toolName} entrypoint discovered`)
@@ -414,7 +601,8 @@ function renderRunnerState(toolName, toolInfo) {
   } else {
     launchBtn.textContent = 'LAUNCH HEADFUL ENGINE'
     runnerChip.textContent = 'headful-ready'
-    scrapeShell.remove()
+    if (scrapeShell) scrapeShell.remove()
+    if (domOverrideBtn) domOverrideBtn.closest('.dom-override-wrap')?.remove()
   }
 
   launchBtn.addEventListener('click', async () => {
@@ -425,6 +613,23 @@ function renderRunnerState(toolName, toolInfo) {
       window.ghostOps.launchTool(toolName)
     }
   })
+
+  // Wire up DOM Override trigger video button
+  if (domOverrideBtn) {
+    domOverrideBtn.addEventListener('click', async () => {
+      const webview = document.getElementById('scrape-webview')
+      if (!webview) {
+        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview not active — launch session first`)
+        return
+      }
+      try {
+        await armScrapeTagger(webview)
+        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] DOM Override armed — click any element`)
+      } catch (error) {
+        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] DOM Override failed: ${error.message}`)
+      }
+    })
+  }
 
   setChip('state-b')
   mountContent(view)

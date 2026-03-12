@@ -17,7 +17,10 @@ export function playBootSequence(toolName, stageElement, callback) {
   video.autoplay = true
   video.muted = true
   video.playsInline = true
-  video.src = `assets/videos/${String(toolName).toLowerCase()}-boot.mp4`
+
+  const moduleName = String(toolName).toLowerCase();
+  video.src = `assets/modules/${moduleName}/${moduleName}-boot.mp4`;
+
   video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;background:#000;display:block;'
 
   stageElement.innerHTML = ''

@@ -6,6 +6,13 @@ const { spawn } = require('child_process')
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
 const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub'])
 let activeToolProcess = null
+const currentSessionLogs = []
+
+function renderLogStamp(rawIso) {
+  const date = new Date(rawIso || Date.now())
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
+  return safeDate.toISOString().replace('T', ' ').slice(0, 19)
+}
 
 function stopActiveToolProcess(sender) {
   if (activeToolProcess && !activeToolProcess.killed) {
@@ -153,6 +160,27 @@ ipcMain.on('launch-tool', (event, rawToolName) => {
   launchedProcess.on('error', (error) => {
     event.sender.send('tool-log', `[system] failed to launch: ${error.message}`)
   })
+})
+
+ipcMain.on('scrape:capture-selector', (event, data) => {
+  const alias = typeof data?.alias === 'string' ? data.alias.trim() : ''
+  const selector = typeof data?.selector === 'string' ? data.selector.trim() : ''
+  const toolName = typeof data?.toolName === 'string' && data.toolName.trim() ? data.toolName.trim() : 'SCRAPEtag'
+  const timestamp = typeof data?.timestamp === 'string' && data.timestamp.trim() ? data.timestamp.trim() : new Date().toISOString()
+
+  if (!alias || !selector) {
+    return
+  }
+
+  currentSessionLogs.push({
+    timestamp,
+    tool: toolName,
+    type: 'selector',
+    alias,
+    selector
+  })
+
+  event.sender.send('tool-log', `[${renderLogStamp(timestamp)}] [CAPTURED] ${alias} -> ${selector}`)
 })
 
 app.whenReady().then(() => {

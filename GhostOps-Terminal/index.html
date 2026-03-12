@@ -13,8 +13,8 @@
     <div class="hud-shell">
       <aside class="sidebar panel-frame">
         <header class="sidebar-header" id="logo-container">
-          <video id="intro-vid" src="./assets/GHOSTops-startup-sequence.mp4" autoplay muted playsinline></video>
-          <img id="static-logo" src="./assets/GHOSTops-terminal-logo-2.png" alt="GHOSTops Logo" style="display: none;" />
+          <video id="intro-vid" src="./assets/core/GHOSTops-startup-sequence.mp4" autoplay muted playsinline></video>
+          <img id="static-logo" src="./assets/core/GHOSTops-terminal-logo-2.png" alt="GHOSTops Logo" style="display: none;" />
         </header>
 
         <nav class="tool-nav" aria-label="Tool Navigation">
@@ -39,15 +39,15 @@
             <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
             <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           </div>
-          <div class="sidebar-anchors" style="margin-top: auto; padding-top: 15px; border-top: 1px solid #b8ff5a; display: flex; flex-direction: column; gap: 8px;">
+          <div class="sidebar-anchors" style="margin-top: auto; padding-top: 15px; border-top: 1px solid var(--accent-primary); display: flex; flex-direction: column; gap: 8px;">
             <button class="nav-item" id="nav-settings" data-route="config">
               <span class="nav-logo-wrap">
-                <span class="nav-name" style="margin: 0 auto; color: #b8ff5a;">[ SETTINGS ]</span>
+                <span class="nav-name" style="margin: 0 auto; color: var(--accent-primary);">[ SETTINGS ]</span>
               </span>
             </button>
             <button class="nav-item" id="nav-signin" data-route="auth">
               <span class="nav-logo-wrap">
-                <span class="nav-name" style="margin: 0 auto; color: #b8ff5a;">[ SIGN IN ]</span>
+                <span class="nav-name" style="margin: 0 auto; color: var(--accent-primary);">[ SIGN IN ]</span>
               </span>
             </button>
             <button class="nav-item nav-docs" data-route="docs" data-tool="SYSTEM">
@@ -71,7 +71,7 @@
       </aside>
 
       <main class="stage-wrap panel-frame">
-        <header class="stage-header panel-inner">
+        <header id="tactical-stage-header" class="stage-header panel-inner">
           <div>
             <p class="kicker">Tactical Stage</p>
             <h2 id="stage-title">SCRAPEtag</h2>
@@ -131,7 +131,35 @@
             <h3>Tactical Runner</h3>
             <span class="runner-chip">headful-ready</span>
           </header>
-          <button id="launch-engine" class="primary-action">LAUNCH HEADFUL ENGINE</button>
+
+          <!-- 3-COLUMN TACTICAL ROW -->
+          <div class="tactical-row">
+            <!-- LEFT: status pill -->
+            <div class="tactical-col tactical-col-left">
+              <span class="runner-chip" style="font-size:0.68rem;">in-app-ready</span>
+            </div>
+
+            <!-- CENTER: launch button -->
+            <div class="tactical-col tactical-col-center">
+              <button id="launch-engine" class="primary-action" style="max-width:50%;width:100%;">LAUNCH HEADFUL ENGINE</button>
+            </div>
+
+            <!-- RIGHT: DOM Override video trigger -->
+            <div class="tactical-col tactical-col-right dom-override-wrap">
+              <video
+                id="dom-override-trigger"
+                src="assets/modules/scrapetag/TRIGGER_DOM_MANUAL.mov"
+                poster="assets/modules/scrapetag/static_dom_pause.png"
+                autoplay
+                loop
+                muted
+                playsinline
+                title="DOM Override"
+              ></video>
+              <span class="dom-override-label">[ DOM OVERRIDE ]</span>
+            </div>
+          </div>
+
           <section id="scrape-shell" class="scrape-shell" hidden>
             <header class="scrape-shell-header">
               <p>In-App Target Session</p>
@@ -169,7 +197,7 @@
         <h4>Security Notes</h4>
         <ul>
           <li>Renderer uses preload scoped APIs only</li>
-          <li>Main process validates tool names before touching filesystem</li>
+          <li>Main process validates tool names before spawn</li>
           <li>No direct Node access in browser context</li>
         </ul>
       </article>
