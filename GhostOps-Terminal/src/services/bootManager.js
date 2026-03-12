@@ -12,6 +12,7 @@ const moduleBootConfig = {
 }
 
 const SKIP_BOOT_KEY = 'ghostops_skip_boot_sequences'
+const moduleBootCounts = JSON.parse(localStorage.getItem('ghostops_boot_counts') || '{}')
 const NUDGE_DELAY_MS = 5000
 
 export function playBootSequence(toolName, stageContent, onComplete) {
@@ -45,34 +46,19 @@ export function playBootSequence(toolName, stageContent, onComplete) {
     onComplete()
   })
 
-  // Nudge after 5 seconds — "skip boot sequences?" small button
-  const nudgeTimer = setTimeout(() => {
+  const bootCount = (moduleBootCounts[toolName] || 0) + 1
+  moduleBootCounts[toolName] = bootCount
+  localStorage.setItem('ghostops_boot_counts', JSON.stringify(moduleBootCounts))
+
+  const nudgeTimer = bootCount > 1 ? setTimeout(() => {
     const nudge = document.createElement('button')
     nudge.textContent = 'Skip boot sequences? → Settings'
-    nudge.style.cssText = `
-      position:absolute;
-      bottom:12px;
-      right:12px;
-      background:transparent;
-      border:1px solid ${config.color};
-      color:${config.color};
-      font-family:"Share Tech Mono",monospace;
-      font-size:0.62rem;
-      letter-spacing:0.08em;
-      padding:4px 10px;
-      border-radius:4px;
-      cursor:pointer;
-      opacity:0.6;
-      transition:opacity 0.2s;
-    `
+    nudge.style.cssText = `position:absolute;bottom:12px;right:12px;background:transparent;border:1px solid ${config.color};color:${config.color};font-family:"Share Tech Mono",monospace;font-size:0.62rem;letter-spacing:0.08em;padding:4px 10px;border-radius:4px;cursor:pointer;opacity:0.6;transition:opacity 0.2s;`
     nudge.addEventListener('mouseenter', () => { nudge.style.opacity = '1' })
     nudge.addEventListener('mouseleave', () => { nudge.style.opacity = '0.6' })
-    nudge.addEventListener('click', () => {
-      // TODO: navigate to settings toggle when settings panel is built
-      onComplete()
-    })
+    nudge.addEventListener('click', () => { onComplete() })
     wrap.appendChild(nudge)
-  }, NUDGE_DELAY_MS)
+  }, NUDGE_DELAY_MS) : null
 
   vid.addEventListener('ended', () => clearTimeout(nudgeTimer))
   vid.addEventListener('error', () => clearTimeout(nudgeTimer))
