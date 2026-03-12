@@ -745,12 +745,84 @@ function bindToolLogs() {
   })
 }
 
+function renderWelcomeScreen() {
+  stageTitle.textContent = 'GHOSTOPS TERMINAL'
+  toolHealth.textContent = 'ONLINE'
+  const isFirstBoot = !localStorage.getItem('ghostops_booted')
+  
+  stageContent.classList.remove('fade-swap')
+  stageContent.innerHTML = ''
+
+  const wrap = document.createElement('div')
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:24px;padding:24px;'
+
+  const vid = document.createElement('video')
+  vid.src = 'assets/modules/scrapetag/ghost-crawler-idle.mp4'
+  vid.autoplay = true
+  vid.loop = true
+  vid.muted = true
+  vid.playsInline = true
+  vid.style.cssText = 'width:320px;height:320px;object-fit:contain;border-radius:12px;'
+
+  const textBlock = document.createElement('div')
+  textBlock.style.cssText = 'text-align:center;font-family:"Share Tech Mono",monospace;color:#b8ff5a;text-shadow:0 0 8px #b8ff5a;'
+
+  const line1 = document.createElement('div')
+  line1.style.cssText = 'font-size:1.1rem;letter-spacing:0.14em;margin-bottom:8px;'
+  const line2 = document.createElement('div')
+  line2.style.cssText = 'font-size:0.8rem;letter-spacing:0.1em;opacity:0.75;margin-bottom:16px;'
+  const line3 = document.createElement('div')
+  line3.style.cssText = 'font-size:0.72rem;letter-spacing:0.08em;opacity:0.5;'
+
+  textBlock.appendChild(line1)
+  textBlock.appendChild(line2)
+  textBlock.appendChild(line3)
+  wrap.appendChild(vid)
+  wrap.appendChild(textBlock)
+  stageContent.appendChild(wrap)
+  requestAnimationFrame(() => stageContent.classList.add('fade-swap'))
+
+  const fullLine1 = '> GHOSTOPS TERMINAL ONLINE'
+  const fullLine2 = 'SYSTEMS NOMINAL. ALL MODULES STANDING BY._'
+  const fullLine3 = isFirstBoot
+    ? 'NEW OPERATIVE DETECTED — SELECT A MODULE OR VIEW SYSTEM DOCS TO BEGIN.'
+    : 'SELECT A MODULE FROM OPERATIONAL MODULES TO BEGIN.'
+
+  let i = 0
+  let j = 0
+  let k = 0
+
+  const typeChar = (str, el, idx, next) => {
+    if (idx < str.length) {
+      el.textContent += str[idx]
+      setTimeout(() => typeChar(str, el, idx + 1, next), 38)
+    } else if (next) {
+      setTimeout(next, 120)
+    }
+  }
+
+  typeChar(fullLine1, line1, i, () => {
+    typeChar(fullLine2, line2, j, () => {
+      typeChar(fullLine3, line3, k, () => {
+        localStorage.setItem('ghostops_booted', '1')
+        const readmeBtn = document.createElement('button')
+        readmeBtn.textContent = '[ VIEW SYSTEM README ]'
+        readmeBtn.id = 'welcome-readme-btn'
+        readmeBtn.style.cssText = 'margin-top:8px;background:transparent;border:1px solid #b8ff5a;color:#b8ff5a;font-family:"Share Tech Mono",monospace;font-size:0.7rem;letter-spacing:0.12em;padding:6px 16px;border-radius:6px;cursor:pointer;opacity:0.7;transition:opacity 0.2s;'
+        readmeBtn.addEventListener('mouseenter', () => { readmeBtn.style.opacity = '1' })
+        readmeBtn.addEventListener('mouseleave', () => { readmeBtn.style.opacity = '0.7' })
+        readmeBtn.addEventListener('click', () => { /* TODO: navigate to system docs */ })
+        textBlock.appendChild(readmeBtn)
+      })
+    })
+  })
+}
+
 async function boot() {
   bindToolLogs()
   bindNavigation()
   setNavSelection()
-  await refreshActiveStage()
-  startPollingLoop()
+  renderWelcomeScreen()
 }
 
 boot()
