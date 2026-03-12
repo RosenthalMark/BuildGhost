@@ -1,40 +1,82 @@
-const initializedModules = new Set()
+'use strict'
 
-export function playBootSequence(toolName, stageElement, callback) {
-  if (initializedModules.has(toolName)) {
-    callback()
+const moduleBootConfig = {
+  SCRAPEtag: {
+    video: 'assets/modules/scrapetag/scrapetag-boot.mp4',
+    color: '#b8ff5a'
+  },
+  GHOSTstub: {
+    video: 'assets/modules/ghoststub/ghoststub-boot.mp4',
+    color: '#ff5e5e'
+  }
+}
+
+const SKIP_BOOT_KEY = 'ghostops_skip_boot_sequences'
+const NUDGE_DELAY_MS = 5000
+
+export function playBootSequence(toolName, stageContent, onComplete) {
+  const skipBoot = localStorage.getItem(SKIP_BOOT_KEY) === '1'
+  const config = moduleBootConfig[toolName]
+
+  if (skipBoot || !config) {
+    onComplete()
     return
   }
 
-  initializedModules.add(toolName)
+  stageContent.classList.remove('fade-swap')
+  stageContent.innerHTML = ''
 
-  if (!stageElement) {
-    callback()
-    return
-  }
+  const wrap = document.createElement('div')
+  wrap.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;background:#000;border-radius:10px;position:relative;overflow:hidden;'
 
-  const video = document.createElement('video')
-  video.autoplay = true
-  video.muted = true
-  video.playsInline = true
+  const vid = document.createElement('video')
+  vid.src = config.video
+  vid.autoplay = true
+  vid.muted = true
+  vid.playsInline = true
+  vid.controls = false
+  vid.style.cssText = 'width:100%;height:100%;object-fit:contain;'
 
-  const moduleName = String(toolName).toLowerCase();
-  video.src = `assets/modules/${moduleName}/${moduleName}-boot.mp4`;
+  vid.addEventListener('ended', () => {
+    onComplete()
+  })
 
-  video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;background:#000;display:block;'
+  vid.addEventListener('error', () => {
+    onComplete()
+  })
 
-  stageElement.innerHTML = ''
-  stageElement.appendChild(video)
+  // Nudge after 5 seconds — "skip boot sequences?" small button
+  const nudgeTimer = setTimeout(() => {
+    const nudge = document.createElement('button')
+    nudge.textContent = 'Skip boot sequences? → Settings'
+    nudge.style.cssText = `
+      position:absolute;
+      bottom:12px;
+      right:12px;
+      background:transparent;
+      border:1px solid ${config.color};
+      color:${config.color};
+      font-family:"Share Tech Mono",monospace;
+      font-size:0.62rem;
+      letter-spacing:0.08em;
+      padding:4px 10px;
+      border-radius:4px;
+      cursor:pointer;
+      opacity:0.6;
+      transition:opacity 0.2s;
+    `
+    nudge.addEventListener('mouseenter', () => { nudge.style.opacity = '1' })
+    nudge.addEventListener('mouseleave', () => { nudge.style.opacity = '0.6' })
+    nudge.addEventListener('click', () => {
+      // TODO: navigate to settings toggle when settings panel is built
+      onComplete()
+    })
+    wrap.appendChild(nudge)
+  }, NUDGE_DELAY_MS)
 
-  let finished = false
-  const done = () => {
-    if (finished) {
-      return
-    }
-    finished = true
-    callback()
-  }
+  vid.addEventListener('ended', () => clearTimeout(nudgeTimer))
+  vid.addEventListener('error', () => clearTimeout(nudgeTimer))
 
-  video.addEventListener('ended', done, { once: true })
-  video.addEventListener('error', done, { once: true })
+  wrap.appendChild(vid)
+  stageContent.appendChild(wrap)
 }
