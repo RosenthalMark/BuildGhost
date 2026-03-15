@@ -127,6 +127,17 @@
     <template id="tactical-runner-template">
       <section class="state-grid single-column">
         <div class="module-card runner-grid">
+          <!-- SELECTOR DISPLAY -->
+          <div class="selector-display-wrap">
+            <img
+              src="assets/modules/scrapetag/scrapetag-selector-display.png"
+              class="selector-display-img"
+              alt="Selector Display"
+            />
+            <div id="selector-display-text" class="selector-display-text">
+              &gt; STANDBY... NO TARGET LOCKED_
+            </div>
+          </div>
           <header class="runner-header">
             <h3>Tactical Runner</h3>
             <span class="runner-chip">headful-ready</span>
@@ -134,29 +145,29 @@
 
           <!-- 3-COLUMN TACTICAL ROW -->
           <div class="tactical-row">
-            <!-- LEFT: status pill -->
+            <!-- LEFT: crawler idle decoration -->
             <div class="tactical-col tactical-col-left">
-              <span class="runner-chip" style="font-size:0.68rem;">in-app-ready</span>
-            </div>
-
-            <!-- CENTER: launch button -->
-            <div class="tactical-col tactical-col-center">
-              <button id="launch-engine" class="primary-action" style="max-width:50%;width:100%;">LAUNCH HEADFUL ENGINE</button>
-            </div>
-
-            <!-- RIGHT: DOM Override video trigger -->
-            <div class="tactical-col tactical-col-right dom-override-wrap">
               <video
-                id="dom-override-trigger"
-                src="assets/modules/scrapetag/TRIGGER_DOM_MANUAL.mov"
-                poster="assets/modules/scrapetag/static_dom_pause.png"
-                autoplay
-                loop
-                muted
-                playsinline
-                title="DOM Override"
+                id="crawler-idle"
+                src="assets/modules/scrapetag/ghost-crawler-idle.mp4"
+                autoplay loop muted playsinline
+                style="height:56px; width:auto; display:block; border-radius:6px; background:transparent;"
               ></video>
-              <span class="dom-override-label">[ DOM OVERRIDE ]</span>
+            </div>
+
+            <!-- CENTER: LAUNCH IN-APP SCRAPE button -->
+            <div class="tactical-col tactical-col-center">
+              <button id="launch-scrape-btn" class="img-btn" aria-label="Launch In-App Scrape">
+                <img src="assets/modules/scrapetag/launch-scrape.png" alt="Launch In-App Scrape" style="height:56px; width:auto; display:block;" />
+              </button>
+            </div>
+
+            <!-- RIGHT: PAUSE / RESUME toggle -->
+            <div class="tactical-col tactical-col-right">
+              <button id="pause-resume-btn" class="img-btn" aria-label="Pause Crawler" data-state="running">
+                <img id="pause-resume-img" src="assets/modules/scrapetag/pause-crawler.gif" alt="Pause Crawler" style="height:56px; width:auto; display:block;" />
+              </button>
+              <span class="dom-override-label" id="pause-resume-label">[ PAUSE CRAWLER ]</span>
             </div>
           </div>
 

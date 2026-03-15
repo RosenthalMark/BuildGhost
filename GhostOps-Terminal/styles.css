@@ -717,3 +717,54 @@ body {
 .stat-label { color: var(--line-hot) !important; } /* Keeps POLLING/SELECTED green */
 .stat-value { color: #ffffff !important; } /* Turns the dynamic values white */
 .terminal-log { color: #ffffff !important; } /* Base terminal text is white */
+/* ── IMG BUTTONS ───────────────────────────── */
+.img-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: block;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.img-btn:hover {
+  filter: drop-shadow(0 0 8px #b8ff5a) brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.img-btn:active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+/* ── SELECTOR DISPLAY ───────────────────────────── */
+.selector-display-wrap {
+  position: relative;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.selector-display-img {
+  max-height: 80px;
+  width: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.selector-display-text {
+  position: absolute;
+  top: 50%;
+  left: 22%;
+  right: 6%;
+  transform: translateY(-50%);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+  color: #b8ff5a;
+  text-shadow: 0 0 6px #b8ff5a, 0 0 12px #b8ff5a;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}

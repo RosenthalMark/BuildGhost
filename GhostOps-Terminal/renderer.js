@@ -596,23 +596,25 @@ function renderRunnerState(toolName, toolInfo) {
   }
 
   if (toolName === 'SCRAPEtag') {
-    launchBtn.textContent = 'LAUNCH IN-APP SCRAPE'
+    if (launchBtn) launchBtn.textContent = 'LAUNCH IN-APP SCRAPE'
     runnerChip.textContent = 'in-app-ready'
   } else {
-    launchBtn.textContent = 'LAUNCH HEADFUL ENGINE'
+    if (launchBtn) launchBtn.textContent = 'LAUNCH HEADFUL ENGINE'
     runnerChip.textContent = 'headful-ready'
     if (scrapeShell) scrapeShell.remove()
     if (domOverrideBtn) domOverrideBtn.closest('.dom-override-wrap')?.remove()
   }
 
-  launchBtn.addEventListener('click', async () => {
-    appendTerminalLine(`[${isoStamp()}] launch requested for ${toolName} at ${toolInfo.entryPath}`)
-    if (toolName === 'SCRAPEtag') {
-      launchScrapeSession()
-    } else {
-      window.ghostOps.launchTool(toolName)
-    }
-  })
+  if (launchBtn) {
+    launchBtn.addEventListener('click', async () => {
+      appendTerminalLine(`[${isoStamp()}] launch requested for ${toolName} at ${toolInfo.entryPath}`)
+      if (toolName === 'SCRAPEtag') {
+        launchScrapeSession()
+      } else {
+        window.ghostOps.launchTool(toolName)
+      }
+    })
+  }
 
   // Wire up DOM Override trigger video button
   if (domOverrideBtn) {
@@ -633,6 +635,27 @@ function renderRunnerState(toolName, toolInfo) {
 
   setChip('state-b')
   mountContent(view)
+  // PAUSE / RESUME toggle
+  const pauseBtn = document.getElementById('pause-resume-btn')
+  const pauseImg = document.getElementById('pause-resume-img')
+  const pauseLabel = document.getElementById('pause-resume-label')
+
+  if (pauseBtn && pauseImg && pauseLabel) {
+    pauseBtn.addEventListener('click', () => {
+      const isRunning = pauseBtn.dataset.state === 'running'
+      if (isRunning) {
+        pauseImg.src = 'assets/modules/scrapetag/resume-crawler.gif'
+        pauseBtn.setAttribute('aria-label', 'Resume Crawler')
+        pauseLabel.textContent = '[ RESUME CRAWLER ]'
+        pauseBtn.dataset.state = 'paused'
+      } else {
+        pauseImg.src = 'assets/modules/scrapetag/pause-crawler.gif'
+        pauseBtn.setAttribute('aria-label', 'Pause Crawler')
+        pauseLabel.textContent = '[ PAUSE CRAWLER ]'
+        pauseBtn.dataset.state = 'running'
+      }
+    })
+  }
   terminalLogNode = document.getElementById('terminal-log')
   terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
   terminalLogNode.scrollTop = terminalLogNode.scrollHeight
@@ -742,6 +765,19 @@ function bindToolLogs() {
 
   unsubscribeToolLog = window.ghostOps.onToolLog((line) => {
     appendTerminalLine(line)
+    // Update selector display if this is a CAPTURED event
+    if (line && line.includes('[CAPTURED]')) {
+      const displayEl = document.getElementById('selector-display-text')
+      if (displayEl) {
+        // Extract alias and selector from log format: [CAPTURED] alias -> selector
+        const match = line.match(/\[CAPTURED\]\s+(.+?)\s+->\s+(.+)/)
+        if (match) {
+          const alias = match[1].trim()
+          const selector = match[2].trim()
+          displayEl.textContent = `> TARGET ACQUIRED: ${alias} → ${selector}_`
+        }
+      }
+    }
   })
 }
 
