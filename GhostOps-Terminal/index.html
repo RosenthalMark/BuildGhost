@@ -39,24 +39,25 @@
             <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
             <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           </div>
-          <div class="sidebar-anchors" style="margin-top: auto; padding-top: 15px; border-top: 1px solid var(--accent-primary); display: flex; flex-direction: column; gap: 8px;">
-            <button class="nav-item" id="nav-settings" data-route="config">
-              <span class="nav-logo-wrap">
-                <span class="nav-name" style="margin: 0 auto; color: var(--accent-primary);">[ SETTINGS ]</span>
-              </span>
-            </button>
-            <button class="nav-item" id="nav-signin" data-route="auth">
-              <span class="nav-logo-wrap">
-                <span class="nav-name" style="margin: 0 auto; color: var(--accent-primary);">[ SIGN IN ]</span>
-              </span>
-            </button>
-            <button class="nav-item nav-docs" data-route="docs" data-tool="SYSTEM">
-              <span class="nav-logo-wrap">
-                <span class="nav-name">SYSTEM DOCS</span>
-              </span>
-            </button>
-          </div>
         </nav>
+
+        <div class="sidebar-anchors panel-inner">
+          <button class="nav-item nav-anchor-btn" id="nav-settings" data-route="config">
+            <span class="nav-logo-wrap">
+              <span class="nav-name nav-anchor-label">[ SETTINGS ]</span>
+            </span>
+          </button>
+          <button class="nav-item nav-anchor-btn" id="nav-signin" data-route="auth">
+            <span class="nav-logo-wrap">
+              <span class="nav-name nav-anchor-label">[ SIGN IN ]</span>
+            </span>
+          </button>
+          <button class="nav-item nav-anchor-btn nav-docs" data-route="docs" data-tool="SYSTEM">
+            <span class="nav-logo-wrap">
+              <span class="nav-name nav-anchor-label">SYSTEM DOCS</span>
+            </span>
+          </button>
+        </div>
 
         <footer class="sidebar-footer panel-inner">
           <div>
@@ -72,26 +73,27 @@
 
       <main class="stage-wrap panel-frame">
         <header id="tactical-stage-header" class="stage-header panel-inner">
-          <div>
+          <div class="stage-header-main">
             <p class="kicker">Tactical Stage</p>
             <h2 id="stage-title">SCRAPEtag</h2>
           </div>
-          <div class="signal-group">
-            <span class="signal-dot"></span>
-            <span id="tool-health">verifying</span>
+          <div id="nixie-scroller" class="nixie-scroller nixie-scroller--header" aria-live="polite">
+            <span class="nixie-text">&gt; READY FOR MODULE TELEMETRY_</span>
+          </div>
+          <div class="signal-group-wrap">
+            <div class="signal-group">
+              <span class="signal-dot"></span>
+              <span id="tool-health">verifying</span>
+            </div>
+            <span id="stage-chip" class="stage-chip" style="display:block; text-align:center; margin-top:2px; font-size:0.65rem;">pending</span>
           </div>
         </header>
-
-        <div id="nixie-scroller" class="nixie-scroller">
-          <span class="nixie-text">&gt; SYSTEM STANDBY... AWAITING CONTEXT_</span>
-        </div>
 
         <section class="stage-main panel-inner">
           <div class="window-stack">
             <section class="window-frame shell-window">
               <header class="window-topbar">
-                <span>Context Resolver</span>
-                <span id="stage-chip" class="stage-chip">pending</span>
+                <span></span>
               </header>
               <article id="stage-content" class="window-content fade-swap" aria-live="polite"></article>
             </section>
@@ -127,59 +129,50 @@
     <template id="tactical-runner-template">
       <section class="state-grid single-column">
         <div class="module-card runner-grid">
-          <!-- SELECTOR DISPLAY -->
-          <div class="selector-display-wrap">
-            <img
-              src="assets/modules/scrapetag/scrapetag-selector-display.png"
-              class="selector-display-img"
-              alt="Selector Display"
-            />
-            <div id="selector-display-text" class="selector-display-text">
-              &gt; STANDBY... NO TARGET LOCKED_
-            </div>
-          </div>
-          <header class="runner-header">
+          <header class="runner-command-row">
             <h3>Tactical Runner</h3>
-            <span class="runner-chip">headful-ready</span>
-          </header>
-
-          <!-- 3-COLUMN TACTICAL ROW -->
-          <div class="tactical-row">
-            <!-- LEFT: crawler idle decoration -->
-            <div class="tactical-col tactical-col-left">
-              <video
-                id="crawler-idle"
-                src="assets/modules/scrapetag/ghost-crawler-idle.mp4"
-                autoplay loop muted playsinline
-                style="height:56px; width:auto; display:block; border-radius:6px; background:transparent;"
-              ></video>
-            </div>
-
-            <!-- CENTER: LAUNCH IN-APP SCRAPE button -->
-            <div class="tactical-col tactical-col-center">
-              <button id="launch-scrape-btn" class="img-btn" aria-label="Launch In-App Scrape">
-                <img src="assets/modules/scrapetag/launch-scrape.png" alt="Launch In-App Scrape" style="height:56px; width:auto; display:block;" />
+            <div class="runner-launch-wrap">
+              <button
+                id="launch-scrape-btn"
+                type="button"
+                class="launch-spacebar-key"
+                aria-label="Launch in-app scrape session"
+              >
+                <span class="launch-key-bezel">
+                  <span class="launch-key-label-root" aria-hidden="true"></span>
+                </span>
               </button>
             </div>
-
-            <!-- RIGHT: PAUSE / RESUME toggle -->
-            <div class="tactical-col tactical-col-right">
+            <div class="runner-actions" data-scrapetag-only>
               <button id="pause-resume-btn" class="img-btn" aria-label="Pause Crawler" data-state="running">
-                <img id="pause-resume-img" src="assets/modules/scrapetag/pause-crawler.gif" alt="Pause Crawler" style="height:56px; width:auto; display:block;" />
+                <img id="pause-resume-img" src="assets/modules/scrapetag/pause-crawler.gif" alt="Pause Crawler" class="tactical-img" />
               </button>
               <span class="dom-override-label" id="pause-resume-label">[ PAUSE CRAWLER ]</span>
             </div>
+          </header>
+
+          <div class="session-control-bar" data-scrapetag-only>
+            <p>In-App Target Session</p>
+            <button id="rearm-tagger" class="secondary-action">REARM TAGGER</button>
+          </div>
+
+          <div class="scrape-url-bar" data-scrapetag-only>
+            <label class="scrape-url-label" for="scrape-target-url">TARGET URL</label>
+            <input
+              id="scrape-target-url"
+              class="scrape-url-input"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="https://example.com"
+            />
           </div>
 
           <section id="scrape-shell" class="scrape-shell" hidden>
-            <header class="scrape-shell-header">
-              <p>In-App Target Session</p>
-              <button id="rearm-tagger" class="secondary-action">REARM TAGGER</button>
-            </header>
             <webview
               id="scrape-webview"
               class="scrape-webview"
-              src="https://testghost.com"
+              src="about:blank"
               partition="persist:ghostops-scrape"
               allowpopups="false"
             ></webview>
@@ -187,6 +180,23 @@
           <pre id="terminal-log" class="terminal-log"></pre>
         </div>
       </section>
+    </template>
+
+    <template id="placeholder-config-template">
+      <article class="docs-view">
+        <h3>Settings</h3>
+        <p>
+          Operator preferences and session controls will live here. For now, boot sequences can be skipped by setting
+          <code>localStorage.ghostops_skip_boot_sequences = '1'</code> in DevTools.
+        </p>
+      </article>
+    </template>
+
+    <template id="placeholder-auth-template">
+      <article class="docs-view">
+        <h3>Sign In</h3>
+        <p>Identity and tenancy are not wired yet. This screen reserves the route for a future auth bridge.</p>
+      </article>
     </template>
 
     <template id="docs-template">

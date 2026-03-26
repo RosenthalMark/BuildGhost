@@ -89,15 +89,13 @@ ipcMain.handle('ghostops:initialize-tool', async (_event, rawToolName) => {
     }
 
     if (!fs.existsSync(entryPath)) {
+      // Side-effect entry so `node index.js` and GHOSTops launchTool both do visible work.
       const scaffold = [
         `'use strict'`,
         '',
-        'module.exports = {',
-        `  id: '${toolName}',`,
-        '  run: async () => {',
-        `    return '${toolName} initialized'`,
-        '  }',
-        '}'
+        `console.log('[${toolName}] scaffold online — replace with module implementation.')`,
+        `console.log('[${toolName}] entry: ${entryPath.replace(/'/g, "\\'")}')`,
+        ''
       ].join('\n')
       fs.writeFileSync(entryPath, `${scaffold}\n`, 'utf8')
     }

@@ -1,5 +1,6 @@
 'use strict'
 
+// GHOSTstub boot file is a stand-in until a module-specific clip ships (keep paths distinct in UI).
 const moduleBootConfig = {
   SCRAPEtag: {
     video: 'assets/modules/scrapetag/scrapetag-boot.mp4',
@@ -38,6 +39,21 @@ export function playBootSequence(toolName, stageContent, onComplete) {
   vid.controls = false
   vid.style.cssText = 'width:100%;height:100%;object-fit:contain;'
 
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:clamp(12px,4vh,36px);gap:8px;pointer-events:none;z-index:2;font-family:"Share Tech Mono",monospace;text-align:center;'
+  const overlayKicker = document.createElement('div')
+  overlayKicker.textContent = 'GHOSTOPS // MODULE LOAD'
+  overlayKicker.style.cssText = `color:${config.color};font-size:0.62rem;letter-spacing:0.22em;opacity:0.9;text-shadow:0 0 10px ${config.color};`
+  const overlayTitle = document.createElement('div')
+  overlayTitle.textContent = String(toolName || 'MODULE').toUpperCase()
+  overlayTitle.style.cssText = `color:${config.color};font-size:clamp(0.95rem,2.2vw,1.25rem);letter-spacing:0.2em;font-weight:700;text-shadow:0 0 14px ${config.color};`
+  const overlayHint = document.createElement('div')
+  overlayHint.textContent = 'TAPE DECK — LOADING MODULE ASSET'
+  overlayHint.style.cssText = `color:${config.color};font-size:0.58rem;letter-spacing:0.14em;opacity:0.55;margin-top:4px;`
+  overlay.appendChild(overlayKicker)
+  overlay.appendChild(overlayTitle)
+  overlay.appendChild(overlayHint)
+
   vid.addEventListener('ended', () => {
     onComplete()
   })
@@ -53,7 +69,7 @@ export function playBootSequence(toolName, stageContent, onComplete) {
   const nudgeTimer = bootCount > 1 ? setTimeout(() => {
     const nudge = document.createElement('button')
     nudge.textContent = 'Skip boot sequences? → Settings'
-    nudge.style.cssText = `position:absolute;bottom:12px;right:12px;background:transparent;border:1px solid ${config.color};color:${config.color};font-family:"Share Tech Mono",monospace;font-size:0.62rem;letter-spacing:0.08em;padding:4px 10px;border-radius:4px;cursor:pointer;opacity:0.6;transition:opacity 0.2s;`
+    nudge.style.cssText = `position:absolute;bottom:12px;right:12px;z-index:4;background:transparent;border:1px solid ${config.color};color:${config.color};font-family:"Share Tech Mono",monospace;font-size:0.62rem;letter-spacing:0.08em;padding:4px 10px;border-radius:4px;cursor:pointer;opacity:0.6;transition:opacity 0.2s;`
     nudge.addEventListener('mouseenter', () => { nudge.style.opacity = '1' })
     nudge.addEventListener('mouseleave', () => { nudge.style.opacity = '0.6' })
     nudge.addEventListener('click', () => { onComplete() })
@@ -64,5 +80,6 @@ export function playBootSequence(toolName, stageContent, onComplete) {
   vid.addEventListener('error', () => clearTimeout(nudgeTimer))
 
   wrap.appendChild(vid)
+  wrap.appendChild(overlay)
   stageContent.appendChild(wrap)
 }

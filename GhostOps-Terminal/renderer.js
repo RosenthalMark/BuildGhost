@@ -30,6 +30,35 @@ if (introVid && staticLogo) {
 }
 
 const POLL_INTERVAL_MS = 2500
+const DEFAULT_SCRAPE_URL = 'https://testghost.com'
+const SCRAPE_URL_STORAGE_KEY = 'ghostops_scrape_target_url'
+
+function resolveScrapeTargetUrl(raw) {
+  let s = String(raw || '').trim()
+  if (!s) {
+    return null
+  }
+  const lower = s.toLowerCase()
+  if (lower.startsWith('javascript:') || lower.startsWith('data:')) {
+    return null
+  }
+  if (!/^https?:\/\//i.test(s)) {
+    s = `https://${s}`
+  }
+  try {
+    const u = new URL(s)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      return null
+    }
+    if (!u.hostname) {
+      return null
+    }
+    return u.href
+  } catch {
+    return null
+  }
+}
+
 let activeRoute = 'tool'
 let activeTool = 'SCRAPEtag'
 let lastCapturedAlias = ''
@@ -43,15 +72,203 @@ const toolCache = new Map()
 let selectorCaptureBridgeBound = false
 let lastCaptureFingerprint = ''
 let lastCaptureAt = 0
+let launchKeyAnimGen = 0
+
+function setLaunchKeyStaticLabel(button, label) {
+  launchKeyAnimGen += 1
+  const root = button?.querySelector('.launch-key-label-root')
+  if (!root) return
+  root.textContent = label
+  root.classList.remove('launch-key-label--neon')
+}
+
+function initLaunchSpacebarKey(button, options = {}) {
+  const { label = 'LAUNCH IN-APP SCRAPE', enableCycle = true } = options
+  const root = button?.querySelector('.launch-key-label-root')
+  if (!root) return
+
+  launchKeyAnimGen += 1
+  const gen = launchKeyAnimGen
+  root.textContent = ''
+  root.classList.remove('launch-key-label--neon')
+
+  const chars = []
+  for (const ch of label) {
+    const s = document.createElement('span')
+    s.className = 'launch-ch'
+    s.textContent = ch === ' ' ? '\u00a0' : ch
+    root.appendChild(s)
+    chars.push(s)
+  }
+
+  let hovered = false
+  let greenTimer = null
+  let cycleTimer = null
+
+  const isStale = () => gen !== launchKeyAnimGen
+
+  function clearTimers() {
+    if (greenTimer) {
+      clearTimeout(greenTimer)
+      greenTimer = null
+    }
+    if (cycleTimer) {
+      clearTimeout(cycleTimer)
+      cycleTimer = null
+    }
+  }
+
+  function resetCharsNeutral() {
+    chars.forEach((el) => {
+      el.style.transition = 'none'
+      el.style.transform = 'translateX(0)'
+      el.style.opacity = '1'
+      el.style.transitionDelay = '0s'
+    })
+  }
+
+  function recoverFromHoverAnimated() {
+    root.classList.remove('launch-key-label--neon')
+    chars.forEach((el, i) => {
+      el.style.transition = 'none'
+      const pull = -38 - (i % 6) * 2.5
+      el.style.transform = `translateX(${pull}%)`
+      el.style.opacity = '0.62'
+    })
+    void root.offsetWidth
+    chars.forEach((el, i) => {
+      el.style.transition = 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease'
+      el.style.transitionDelay = `${i * 0.034}s`
+      el.style.transform = 'translateX(0)'
+      el.style.opacity = '1'
+    })
+  }
+
+  function runGreenScroll() {
+    if (isStale() || hovered) return
+    // Idle pulse: keep text centered, only apply neon emphasis.
+    root.classList.add('launch-key-label--neon')
+    chars.forEach((el, i) => {
+      el.style.transition = 'opacity 0.35s ease'
+      el.style.transitionDelay = `${i * 0.018}s`
+      el.style.transform = 'translateX(0)'
+      el.style.opacity = '1'
+    })
+  }
+
+  function runExitThenEnter() {
+    return new Promise((resolve) => {
+      if (isStale() || hovered) {
+        resolve()
+        return
+      }
+      const n = chars.length
+      // Keep neon during the whole cycle, but avoid lateral drift.
+      root.classList.add('launch-key-label--neon')
+      chars.forEach((el, i) => {
+        el.style.transition = 'opacity 0.24s ease'
+        el.style.transitionDelay = `${i * 0.044}s`
+        el.style.transform = 'translateX(0)'
+        el.style.opacity = '0'
+      })
+      const exitMs = Math.max(0, (n - 1) * 44 + 360)
+      setTimeout(() => {
+        if (isStale() || hovered) {
+          resolve()
+          return
+        }
+        chars.forEach((el) => {
+          el.style.transition = 'none'
+          el.style.transform = 'translateX(0)'
+          el.style.opacity = '0'
+        })
+        void root.offsetWidth
+        chars.forEach((el, i) => {
+          const rev = n - 1 - i
+          el.style.transition = 'opacity 0.34s ease'
+          el.style.transitionDelay = `${rev * 0.05}s`
+          el.style.transform = 'translateX(0)'
+          el.style.opacity = '1'
+        })
+        const enterMs = Math.max(0, (n - 1) * 50 + 520)
+        setTimeout(() => {
+          if (!isStale() && !hovered) {
+            root.classList.remove('launch-key-label--neon')
+          }
+          resolve()
+        }, enterMs)
+      }, exitMs)
+    })
+  }
+
+  function scheduleTimers() {
+    clearTimers()
+    if (!enableCycle) return
+    greenTimer = setTimeout(() => {
+      if (isStale() || hovered) return
+      runGreenScroll()
+    }, 5000)
+
+    const queueCycle = () => {
+      if (isStale() || hovered || !enableCycle) return
+      cycleTimer = setTimeout(async () => {
+        if (isStale() || hovered || !enableCycle) return
+        await runExitThenEnter()
+        if (isStale() || hovered || !enableCycle) return
+        queueCycle()
+      }, 8000)
+    }
+    queueCycle()
+  }
+
+  function onPointerEnter() {
+    if (hovered) return
+    hovered = true
+    clearTimers()
+    recoverFromHoverAnimated()
+    root.classList.add('launch-key-label--neon')
+  }
+
+  function onPointerLeave() {
+    hovered = false
+    if (isStale()) return
+    scheduleTimers()
+  }
+
+  resetCharsNeutral()
+
+  button.addEventListener('mouseenter', onPointerEnter)
+  button.addEventListener('mouseleave', onPointerLeave)
+  button.addEventListener('focus', onPointerEnter)
+  button.addEventListener('blur', onPointerLeave)
+
+  button.addEventListener(
+    'click',
+    () => {
+      clearTimers()
+      root.classList.remove('launch-key-label--neon')
+      resetCharsNeutral()
+      setTimeout(() => {
+        if (isStale()) return
+        if (!button.matches(':hover') && document.activeElement !== button) {
+          scheduleTimers()
+        }
+      }, 450)
+    },
+    true
+  )
+
+  scheduleTimers()
+}
 
 const toolConfig = {
   SCRAPEtag: {
-    preview: 'assets/previews/scrapetag.gif',
+    preview: 'assets/modules/scrapetag/scrapetag-selector-display.png',
     description: 'SCRAPEtag module was not discovered in Toolbelt. Initialize to scaffold runtime files and bridge contracts.',
     expectedPath: '../Toolbelt/SCRAPEtag/index.js'
   },
   GHOSTstub: {
-    preview: 'assets/previews/mockops.gif',
+    preview: '../Toolbelt/GHOSTstub/assets/ghostStub-logo.png',
     description: 'GHOSTstub payload engine is not present. Initialize to install synthetic data adapters and scenario mappers.',
     expectedPath: '../Toolbelt/GHOSTstub/index.js'
   }
@@ -63,7 +280,18 @@ function isoStamp() {
 
 function setNavSelection() {
   navItems.forEach((item) => {
-    const match = item.dataset.route === activeRoute && item.dataset.tool === activeTool
+    const route = item.dataset.route
+    const tool = item.dataset.tool
+    let match = false
+    if (activeRoute === 'tool') {
+      match = route === 'tool' && tool === activeTool
+    } else if (activeRoute === 'docs') {
+      match = route === 'docs'
+    } else if (activeRoute === 'config') {
+      match = route === 'config'
+    } else if (activeRoute === 'auth') {
+      match = route === 'auth'
+    }
     item.classList.toggle('active', match)
   })
 }
@@ -71,31 +299,64 @@ function setNavSelection() {
 function setStageIdentity() {
   const isScrapeHud = activeRoute === 'tool' && activeTool === 'SCRAPEtag'
   if (activeRoute === 'docs') {
-    stageTitle.textContent = 'SYSTEM DOCS'
+    if (stageTitle) stageTitle.textContent = 'SYSTEM DOCS'
+  } else if (activeRoute === 'config') {
+    if (stageTitle) stageTitle.textContent = 'SETTINGS'
+  } else if (activeRoute === 'auth') {
+    if (stageTitle) stageTitle.textContent = 'SIGN IN'
   } else if (isScrapeHud && lastCapturedAlias) {
-    stageTitle.textContent = `SCRAPEtag :: ${lastCapturedAlias}`
+    if (stageTitle) stageTitle.textContent = `SCRAPEtag :: ${lastCapturedAlias}`
   } else {
-    stageTitle.textContent = activeTool
+    if (stageTitle) stageTitle.textContent = activeTool
   }
-  selectedStatus.textContent = activeRoute === 'docs' ? 'system' : activeTool.toLowerCase()
+  if (selectedStatus) {
+    if (activeRoute === 'docs') selectedStatus.textContent = 'system'
+    else if (activeRoute === 'config') selectedStatus.textContent = 'settings'
+    else if (activeRoute === 'auth') selectedStatus.textContent = 'auth'
+    else selectedStatus.textContent = activeTool.toLowerCase()
+  }
 }
 
 function setChip(text) {
-  stageChip.textContent = text
+  if (stageChip) stageChip.textContent = text
+}
+
+function updateNixieReadout(plainText) {
+  const el = document.querySelector('.nixie-text')
+  if (!el || !plainText) return
+  const max = 220
+  let t = plainText.length > max ? `${plainText.slice(0, max - 3)}...` : plainText
+  if (!t.startsWith('>')) {
+    t = `> ${t}`
+  }
+  if (!t.endsWith('_')) {
+    t += '_'
+  }
+  el.textContent = t
+}
+
+function updateSelectorHud(alias, selector) {
+  const displayEl = document.getElementById('selector-display-text')
+  if (displayEl) {
+    displayEl.textContent = `> TARGET ACQUIRED: ${alias} → ${selector}_`
+  }
+  updateNixieReadout(`TARGET ACQUIRED :: ${alias} :: ${selector}`)
 }
 
 function setPollingStatus(text, isHealthy) {
-  pollingStatus.textContent = text
-  toolHealth.textContent = text
-  toolHealth.classList.toggle('status-good', Boolean(isHealthy))
-  toolHealth.classList.toggle('status-bad', !isHealthy)
+  if (pollingStatus) pollingStatus.textContent = text
+  if (toolHealth) toolHealth.textContent = text
+  if (toolHealth) toolHealth.classList.toggle('status-good', Boolean(isHealthy))
+  if (toolHealth) toolHealth.classList.toggle('status-bad', !isHealthy)
 }
 
 function cloneTemplate(id) {
-  return document.getElementById(id).content.cloneNode(true)
+  const template = document.getElementById(id)
+  return template ? template.content.cloneNode(true) : document.createDocumentFragment()
 }
 
 function mountContent(node) {
+  if (!stageContent) return
   stageContent.classList.remove('fade-swap')
   stageContent.innerHTML = ''
   stageContent.appendChild(node)
@@ -108,6 +369,15 @@ function appendTerminalLine(text) {
     .filter((line) => line.length > 0)
 
   normalized.forEach((line) => {
+    if (line.includes('[CAPTURED]')) {
+      const cap = line.match(/\[CAPTURED\]\s+(.+?)\s+->\s+(.+)/)
+      if (cap) {
+        updateNixieReadout(`CAPTURE :: ${cap[1].trim()} :: ${cap[2].trim()}`)
+      }
+    } else if (line.includes('[SCRAPEtag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
+      updateNixieReadout(line.replace(/^\[[^\]]+\]\s*/, '').trim())
+    }
+
     const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     let formattedLine = safeLine
     if (safeLine.includes('[CAPTURED]')) {
@@ -198,6 +468,7 @@ function handleScrapeCapture(capture) {
   lastCaptureAt = now
   lastCapturedAlias = normalizedCapture.alias
   setStageIdentity()
+  updateSelectorHud(normalizedCapture.alias, normalizedCapture.selector)
   window.ghostOps.captureSelector?.(normalizedCapture)
 }
 
@@ -470,6 +741,45 @@ async function armScrapeTagger(webview) {
   return injectionResult
 }
 
+async function applyWebviewWidthFit(webview) {
+  if (!webview || typeof webview.getBoundingClientRect !== 'function') {
+    return
+  }
+  try {
+    const hostW = webview.getBoundingClientRect().width
+    if (hostW < 64) {
+      return
+    }
+    const contentW = await webview.executeJavaScript(
+      `
+      (function () {
+        const de = document.documentElement
+        const b = document.body
+        return Math.max(
+          de ? de.scrollWidth : 0,
+          b ? b.scrollWidth : 0,
+          de ? de.clientWidth : 0,
+          1
+        )
+      })()
+    `,
+      true
+    )
+    if (!contentW || contentW <= 0) {
+      webview.setZoomFactor(1)
+      return
+    }
+    const factor = Math.min(1, Math.max(0.2, hostW / contentW))
+    webview.setZoomFactor(factor)
+  } catch {
+    try {
+      webview.setZoomFactor(1)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function bindScrapeWebview(webview) {
   if (!webview || webview.dataset.bound === '1') {
     return
@@ -478,11 +788,22 @@ function bindScrapeWebview(webview) {
   webview.dataset.bound = '1'
 
   webview.addEventListener('did-start-loading', () => {
+    try {
+      webview.setZoomFactor(1)
+    } catch {
+      /* ignore */
+    }
     appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading started`)
   })
 
   webview.addEventListener('did-stop-loading', () => {
     appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading complete`)
+    const u = typeof webview.getURL === 'function' ? webview.getURL() : ''
+    if (u && u !== 'about:blank') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => applyWebviewWidthFit(webview))
+      })
+    }
   })
 
   webview.addEventListener('did-fail-load', (event) => {
@@ -514,21 +835,35 @@ function launchScrapeSession() {
   const scrapeShell = document.getElementById('scrape-shell')
   const webview = document.getElementById('scrape-webview')
   const rearmBtn = document.getElementById('rearm-tagger')
+  const urlInput = document.getElementById('scrape-target-url')
 
   if (!scrapeShell || !webview) {
     appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] in-app webview container unavailable`)
     return
   }
 
+  const rawField = String(urlInput?.value ?? '').trim()
+  let targetUrl = null
+  if (rawField) {
+    targetUrl = resolveScrapeTargetUrl(rawField)
+    if (!targetUrl) {
+      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] invalid target URL`)
+      return
+    }
+  } else {
+    targetUrl =
+      resolveScrapeTargetUrl(localStorage.getItem(SCRAPE_URL_STORAGE_KEY) || '') || DEFAULT_SCRAPE_URL
+  }
+
+  if (urlInput) {
+    urlInput.value = targetUrl
+  }
+  localStorage.setItem(SCRAPE_URL_STORAGE_KEY, targetUrl)
+
   scrapeShell.hidden = false
   bindScrapeWebview(webview)
-  appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] launching in-app session: https://testghost.com`)
-
-  if (webview.getURL && !webview.getURL()) {
-    webview.src = 'https://testghost.com'
-  } else {
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] session already loaded`)
-  }
+  appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] launching in-app session: ${targetUrl}`)
+  webview.src = targetUrl
 
   if (rearmBtn && rearmBtn.dataset.bound !== '1') {
     rearmBtn.dataset.bound = '1'
@@ -558,24 +893,26 @@ async function renderMissingState(toolName, toolInfo) {
   const preview = view.querySelector('#preview-gif')
   const initializeBtn = view.querySelector('#initialize-module')
 
-  description.textContent = cfg.description
-  missingPath.textContent = toolInfo.expectedPath || cfg.expectedPath
-  preview.src = cfg.preview
-  attachPreviewFallback(preview)
+  if (description) description.textContent = cfg.description
+  if (missingPath) missingPath.textContent = toolInfo.expectedPath || cfg.expectedPath
+  if (preview) preview.src = cfg.preview
+  if (preview) attachPreviewFallback(preview)
 
-  initializeBtn.addEventListener('click', async () => {
-    initializeBtn.disabled = true
-    initializeBtn.textContent = 'INITIALIZING MODULE'
-    const result = await window.ghostOps.initializeTool(toolName)
-    if (result.ok) {
-      setPollingStatus('module initialized', true)
-    } else {
-      setPollingStatus('init failed', false)
-      initializeBtn.disabled = false
-      initializeBtn.textContent = 'INITIALIZE MODULE'
-    }
-    await refreshActiveStage()
-  })
+  if (initializeBtn) {
+    initializeBtn.addEventListener('click', async () => {
+      initializeBtn.disabled = true
+      initializeBtn.textContent = 'INITIALIZING MODULE'
+      const result = await window.ghostOps.initializeTool(toolName)
+      if (result.ok) {
+        setPollingStatus('module initialized', true)
+      } else {
+        setPollingStatus('init failed', false)
+        initializeBtn.disabled = false
+        initializeBtn.textContent = 'INITIALIZE MODULE'
+      }
+      await refreshActiveStage()
+    })
+  }
 
   setChip('state-a')
   mountContent(view)
@@ -584,10 +921,10 @@ async function renderMissingState(toolName, toolInfo) {
 
 function renderRunnerState(toolName, toolInfo) {
   const view = cloneTemplate('tactical-runner-template')
-  const launchBtn = view.querySelector('#launch-engine')
+  // Contract: tactical-runner-template uses #launch-scrape-btn (image control), not legacy #launch-engine.
+  const launchBtn = view.querySelector('#launch-scrape-btn')
   const scrapeShell = view.querySelector('#scrape-shell')
   const runnerChip = view.querySelector('.runner-chip')
-  const domOverrideBtn = view.querySelector('#dom-override-trigger')
 
   if (terminalLogBuffer.length === 0) {
     appendTerminalLine(`[${isoStamp()}] ${toolName} entrypoint discovered`)
@@ -595,14 +932,13 @@ function renderRunnerState(toolName, toolInfo) {
     appendTerminalLine(`[${isoStamp()}] note: SCRAPEtag now runs inside the app window`)
   }
 
+  const scrapeOnlyNodes = Array.from(view.querySelectorAll('[data-scrapetag-only]'))
   if (toolName === 'SCRAPEtag') {
-    if (launchBtn) launchBtn.textContent = 'LAUNCH IN-APP SCRAPE'
-    runnerChip.textContent = 'in-app-ready'
+    if (runnerChip) runnerChip.textContent = 'in-app-ready'
   } else {
-    if (launchBtn) launchBtn.textContent = 'LAUNCH HEADFUL ENGINE'
-    runnerChip.textContent = 'headful-ready'
+    if (runnerChip) runnerChip.textContent = 'headful-ready'
     if (scrapeShell) scrapeShell.remove()
-    if (domOverrideBtn) domOverrideBtn.closest('.dom-override-wrap')?.remove()
+    scrapeOnlyNodes.forEach((node) => node.remove())
   }
 
   if (launchBtn) {
@@ -616,31 +952,38 @@ function renderRunnerState(toolName, toolInfo) {
     })
   }
 
-  // Wire up DOM Override trigger video button
-  if (domOverrideBtn) {
-    domOverrideBtn.addEventListener('click', async () => {
-      const webview = document.getElementById('scrape-webview')
-      if (!webview) {
-        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview not active — launch session first`)
-        return
-      }
-      try {
-        await armScrapeTagger(webview)
-        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] DOM Override armed — click any element`)
-      } catch (error) {
-        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] DOM Override failed: ${error.message}`)
-      }
-    })
-  }
-
   setChip('state-b')
   mountContent(view)
+
+  const launchMounted = document.getElementById('launch-scrape-btn')
+  if (launchMounted) {
+    if (toolName === 'SCRAPEtag') {
+      initLaunchSpacebarKey(launchMounted, { label: 'LAUNCH IN-APP SCRAPE', enableCycle: true })
+    } else {
+      setLaunchKeyStaticLabel(launchMounted, 'LAUNCH HEADFUL ENGINE')
+    }
+  }
+
+  if (toolName === 'SCRAPEtag') {
+    const urlField = document.getElementById('scrape-target-url')
+    if (urlField) {
+      const stored = localStorage.getItem(SCRAPE_URL_STORAGE_KEY)
+      urlField.value = stored && resolveScrapeTargetUrl(stored) ? stored : DEFAULT_SCRAPE_URL
+      urlField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          launchScrapeSession()
+        }
+      })
+    }
+  }
+
   // PAUSE / RESUME toggle
   const pauseBtn = document.getElementById('pause-resume-btn')
   const pauseImg = document.getElementById('pause-resume-img')
   const pauseLabel = document.getElementById('pause-resume-label')
 
-  if (pauseBtn && pauseImg && pauseLabel) {
+  if (toolName === 'SCRAPEtag' && pauseBtn && pauseImg && pauseLabel) {
     pauseBtn.addEventListener('click', () => {
       const isRunning = pauseBtn.dataset.state === 'running'
       if (isRunning) {
@@ -657,14 +1000,30 @@ function renderRunnerState(toolName, toolInfo) {
     })
   }
   terminalLogNode = document.getElementById('terminal-log')
-  terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
-  terminalLogNode.scrollTop = terminalLogNode.scrollHeight
+  if (terminalLogNode) terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
+  if (terminalLogNode) terminalLogNode.scrollTop = terminalLogNode.scrollHeight
 }
 
 function renderDocsState() {
   const view = cloneTemplate('docs-template')
   setChip('state-c')
   setPollingStatus('documentation mode', true)
+  mountContent(view)
+  terminalLogNode = null
+}
+
+function renderConfigState() {
+  const view = cloneTemplate('placeholder-config-template')
+  setChip('state-c')
+  setPollingStatus('settings shell', true)
+  mountContent(view)
+  terminalLogNode = null
+}
+
+function renderAuthState() {
+  const view = cloneTemplate('placeholder-auth-template')
+  setChip('state-c')
+  setPollingStatus('auth shell', true)
   mountContent(view)
   terminalLogNode = null
 }
@@ -682,6 +1041,22 @@ async function refreshActiveStage() {
     if (currentStageSignature !== 'docs') {
       renderDocsState()
       currentStageSignature = 'docs'
+    }
+    return
+  }
+
+  if (activeRoute === 'config') {
+    if (currentStageSignature !== 'config') {
+      renderConfigState()
+      currentStageSignature = 'config'
+    }
+    return
+  }
+
+  if (activeRoute === 'auth') {
+    if (currentStageSignature !== 'auth') {
+      renderAuthState()
+      currentStageSignature = 'auth'
     }
     return
   }
@@ -709,7 +1084,7 @@ async function refreshActiveStage() {
   } catch (error) {
     setChip('error')
     setPollingStatus('bridge error', false)
-    stageContent.textContent = `IPC failure while checking ${activeTool}: ${error.message}`
+    if (stageContent) stageContent.textContent = `IPC failure while checking ${activeTool}: ${error.message}`
     currentStageSignature = 'error'
   }
 }
@@ -719,7 +1094,7 @@ function startPollingLoop() {
     clearInterval(pollTimer)
   }
 
-  if (activeRoute === 'docs') {
+  if (activeRoute === 'docs' || activeRoute === 'config' || activeRoute === 'auth') {
     return
   }
 
@@ -734,13 +1109,15 @@ function bindNavigation() {
       const nextRoute = item.dataset.route
       const nextTool = item.dataset.tool
 
-      if (!nextRoute || (nextRoute !== 'tool' && nextRoute !== 'docs')) {
+      if (!nextRoute || !['tool', 'docs', 'config', 'auth'].includes(nextRoute)) {
         return
       }
 
       const continueNav = () => {
         activeRoute = nextRoute
-        activeTool = nextTool
+        if (nextTool) {
+          activeTool = nextTool
+        }
         currentStageSignature = ''
         appendTerminalLine(`[${isoStamp()}] route changed: ${activeRoute}/${activeTool}`)
         setNavSelection()
@@ -749,7 +1126,7 @@ function bindNavigation() {
       }
 
       if (nextRoute === 'tool') {
-        playBootSequence(nextTool, stageContent, continueNav)
+        if (stageContent) playBootSequence(nextTool, stageContent, continueNav)
         return
       }
 
@@ -767,24 +1144,21 @@ function bindToolLogs() {
     appendTerminalLine(line)
     // Update selector display if this is a CAPTURED event
     if (line && line.includes('[CAPTURED]')) {
-      const displayEl = document.getElementById('selector-display-text')
-      if (displayEl) {
-        // Extract alias and selector from log format: [CAPTURED] alias -> selector
-        const match = line.match(/\[CAPTURED\]\s+(.+?)\s+->\s+(.+)/)
-        if (match) {
-          const alias = match[1].trim()
-          const selector = match[2].trim()
-          displayEl.textContent = `> TARGET ACQUIRED: ${alias} → ${selector}_`
-        }
+      const match = line.match(/\[CAPTURED\]\s+(.+?)\s+->\s+(.+)/)
+      if (match) {
+        const alias = match[1].trim()
+        const selector = match[2].trim()
+        updateSelectorHud(alias, selector)
       }
     }
   })
 }
 
 function renderWelcomeScreen() {
-  stageTitle.textContent = 'GHOSTOPS TERMINAL'
-  toolHealth.textContent = 'ONLINE'
+  if (stageTitle) stageTitle.textContent = 'GHOSTOPS TERMINAL'
+  if (toolHealth) toolHealth.textContent = 'ONLINE'
   const isFirstBoot = !localStorage.getItem('ghostops_booted')
+  if (!stageContent) return
   
   stageContent.classList.remove('fade-swap')
   stageContent.innerHTML = ''
@@ -792,28 +1166,31 @@ function renderWelcomeScreen() {
   const wrap = document.createElement('div')
   wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:24px;padding:24px;'
 
-  const vid = document.createElement('video')
-  vid.src = 'assets/modules/scrapetag/ghost-crawler-idle.mp4'
-  vid.autoplay = true
-  vid.loop = true
-  vid.muted = true
-  vid.playsInline = true
-  vid.style.cssText = 'width:320px;height:320px;object-fit:contain;border-radius:12px;'
+  // Main-stage loading theater (ghost at computer / multi-beat placeholder) — separate from sidebar GHOSTops-startup-sequence.mp4.
+  const hero = document.createElement('video')
+  hero.className = 'welcome-hero-video'
+  hero.src = 'assets/modules/scrapetag/ghost-crawler-idle.mp4'
+  hero.autoplay = true
+  hero.loop = true
+  hero.muted = true
+  hero.playsInline = true
+  hero.setAttribute('playsinline', '')
+  hero.setAttribute('aria-label', 'Terminal loading sequence')
 
   const textBlock = document.createElement('div')
   textBlock.style.cssText = 'text-align:center;font-family:"Share Tech Mono",monospace;color:#b8ff5a;text-shadow:0 0 8px #b8ff5a;'
 
   const line1 = document.createElement('div')
-  line1.style.cssText = 'font-size:1.1rem;letter-spacing:0.14em;margin-bottom:8px;'
+  line1.style.cssText = 'font-size:0.95rem;letter-spacing:0.14em;margin-bottom:6px;'
   const line2 = document.createElement('div')
-  line2.style.cssText = 'font-size:0.8rem;letter-spacing:0.1em;opacity:0.75;margin-bottom:16px;'
+  line2.style.cssText = 'font-size:0.72rem;letter-spacing:0.1em;opacity:0.75;margin-bottom:12px;'
   const line3 = document.createElement('div')
-  line3.style.cssText = 'font-size:0.72rem;letter-spacing:0.08em;opacity:0.5;'
+  line3.style.cssText = 'font-size:0.65rem;letter-spacing:0.08em;opacity:0.5;'
 
   textBlock.appendChild(line1)
   textBlock.appendChild(line2)
   textBlock.appendChild(line3)
-  wrap.appendChild(vid)
+  wrap.appendChild(hero)
   wrap.appendChild(textBlock)
   stageContent.appendChild(wrap)
   requestAnimationFrame(() => stageContent.classList.add('fade-swap'))
@@ -847,7 +1224,16 @@ function renderWelcomeScreen() {
         readmeBtn.style.cssText = 'margin-top:8px;background:transparent;border:1px solid #b8ff5a;color:#b8ff5a;font-family:"Share Tech Mono",monospace;font-size:0.7rem;letter-spacing:0.12em;padding:6px 16px;border-radius:6px;cursor:pointer;opacity:0.7;transition:opacity 0.2s;'
         readmeBtn.addEventListener('mouseenter', () => { readmeBtn.style.opacity = '1' })
         readmeBtn.addEventListener('mouseleave', () => { readmeBtn.style.opacity = '0.7' })
-        readmeBtn.addEventListener('click', () => { /* TODO: navigate to system docs */ })
+        readmeBtn.addEventListener('click', () => {
+          activeRoute = 'docs'
+          activeTool = 'SYSTEM'
+          currentStageSignature = ''
+          appendTerminalLine(`[${isoStamp()}] route changed: ${activeRoute}/${activeTool}`)
+          setNavSelection()
+          setStageIdentity()
+          refreshActiveStage()
+          startPollingLoop()
+        })
         textBlock.appendChild(readmeBtn)
       })
     })
@@ -855,6 +1241,10 @@ function renderWelcomeScreen() {
 }
 
 async function boot() {
+  if (!window.ghostOps) {
+    console.error('[renderer] ghostOps bridge not available')
+    return
+  }
   bindToolLogs()
   bindNavigation()
   setNavSelection()
