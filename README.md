@@ -31,13 +31,13 @@ An advanced discovery engine that crawls target applications to identify, catego
 A tactical stubbing layer for stabilizing QA workflows when upstream APIs are unavailable, unstable, or expensive to hit repeatedly. GHOSTSTUB can mirror production payload shapes, inject edge-case variants on demand, and provide reusable fixtures that downstream modules can consume during local and CI validation.
 * **STATUS:** ![Active](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
 
+#### `PROJECT BLACKBOX // RELEASE INTELLIGENCE CORE`
+A strategic analysis module that correlates test runs, network activity, and execution traces to spotlight release-critical risk patterns before merge. PROJECT BLACKBOX is designed to turn noisy QA signals into prioritized, actionable insights for faster, safer ship decisions.
+* **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
+
 ---
 
 ### ROADMAP: The Evolution of GHOSTops
-
-#### `BUILDGHOST // PROJECT BLACKBOX [PLACEHOLDER]`
-Reserved for the next tactical module release.
-* **STATUS:** ![Planned](https://img.shields.io/badge/STATUS-PLANNED-informational?style=flat-square)
 
 #### `BUILDGHOST // MODULE_BETA [PLACEHOLDER]`
 Reserved for the next tactical module release.
