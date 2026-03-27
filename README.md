@@ -32,7 +32,7 @@ A tactical stubbing layer for stabilizing QA workflows when upstream APIs are un
 * **STATUS:** ![Active](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
 
 #### `PROJECT BLACKBOX // RELEASE INTELLIGENCE CORE`
-A strategic analysis module that correlates test runs, network activity, and execution traces to spotlight release-critical risk patterns before merge. PROJECT BLACKBOX is designed to turn noisy QA signals into prioritized, actionable insights for faster, safer ship decisions.
+A release intelligence and test migration module that correlates execution signals while enabling push-button framework conversion across suites (for example `Selenium -> Playwright` and `Cypress -> Playwright`). PROJECT BLACKBOX is designed to reduce rewrite cost, preserve intent, and accelerate safer modernization of legacy automation stacks.
 * **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
 
 ---
