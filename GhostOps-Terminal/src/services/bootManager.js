@@ -9,6 +9,10 @@ const moduleBootConfig = {
   GHOSTstub: {
     video: 'assets/modules/ghoststub/ghoststub-boot.mp4',
     color: '#ff5e5e'
+  },
+  BlackBox: {
+    video: 'assets/modules/blackbox/blackbox-boot.mp4',
+    color: '#b8ff5a'
   }
 }
 

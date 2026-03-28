@@ -587,6 +587,28 @@ body {
   filter: brightness(0.96);
 }
 
+.blackbox-holding {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 8px 12px;
+}
+
+.blackbox-holding-logo {
+  width: min(640px, 86%);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgb(184 255 90 / 0.14));
+}
+
+.blackbox-readme-btn {
+  min-width: 260px;
+}
+
 .secondary-action {
   border: 1px solid rgb(184 255 90 / 0.5);
   border-radius: 4px;

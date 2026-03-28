@@ -271,6 +271,11 @@ const toolConfig = {
     preview: '../Toolbelt/GHOSTstub/assets/ghostStub-logo.png',
     description: 'GHOSTstub payload engine is not present. Initialize to install synthetic data adapters and scenario mappers.',
     expectedPath: '../Toolbelt/GHOSTstub/index.js'
+  },
+  BlackBox: {
+    preview: '../Toolbelt/BlackBox/assets/Blackbox-logo.png',
+    description: 'BLACKbox conversion runtime is not present. Initialize to scaffold migration adapters and compatibility checks.',
+    expectedPath: '../Toolbelt/BlackBox/index.js'
   }
 }
 
@@ -885,7 +890,41 @@ function attachPreviewFallback(img) {
   })
 }
 
+function renderBlackBoxHoldingState(chip = 'state-a') {
+  const wrap = document.createElement('section')
+  wrap.className = 'blackbox-holding'
+
+  const logo = document.createElement('img')
+  logo.className = 'blackbox-holding-logo'
+  logo.src = '../Toolbelt/BlackBox/assets/buildghost-placeholder.png'
+  logo.alt = 'BLACKbox'
+
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'primary-action blackbox-readme-btn'
+  button.textContent = 'VIEW READ ME'
+  button.addEventListener('click', async () => {
+    const openResult = await window.ghostOps.openToolReadme('BlackBox')
+    if (openResult?.ok) {
+      appendTerminalLine(`[${isoStamp()}] [BlackBox] opened README`)
+    } else {
+      appendTerminalLine(`[${isoStamp()}] [BlackBox] failed to open README: ${openResult?.error || 'unknown error'}`)
+    }
+  })
+
+  wrap.appendChild(logo)
+  wrap.appendChild(button)
+  setChip(chip)
+  mountContent(wrap)
+  terminalLogNode = null
+}
+
 async function renderMissingState(toolName, toolInfo) {
+  if (toolName === 'BlackBox') {
+    renderBlackBoxHoldingState('state-a')
+    return
+  }
+
   const cfg = toolConfig[toolName]
   const view = cloneTemplate('module-missing-template')
   const description = view.querySelector('#missing-description')
@@ -920,6 +959,11 @@ async function renderMissingState(toolName, toolInfo) {
 }
 
 function renderRunnerState(toolName, toolInfo) {
+  if (toolName === 'BlackBox') {
+    renderBlackBoxHoldingState('state-b')
+    return
+  }
+
   const view = cloneTemplate('tactical-runner-template')
   // Contract: tactical-runner-template uses #launch-scrape-btn (image control), not legacy #launch-engine.
   const launchBtn = view.querySelector('#launch-scrape-btn')

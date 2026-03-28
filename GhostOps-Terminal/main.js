@@ -1,10 +1,13 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
 
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
-const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub'])
+const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'BlackBox'])
+const TOOL_README_URLS = Object.freeze({
+  BlackBox: 'https://github.com/RosenthalMark/BuildGhost/blob/main/Toolbelt/BlackBox/README.md'
+})
 let activeToolProcess = null
 const currentSessionLogs = []
 
@@ -109,6 +112,38 @@ ipcMain.handle('ghostops:initialize-tool', async (_event, rawToolName) => {
       ok: false,
       error: error.message
     }
+  }
+})
+
+ipcMain.handle('ghostops:open-tool-readme', async (_event, rawToolName) => {
+  const toolName = sanitizeToolName(rawToolName)
+
+  if (!toolName) {
+    return {
+      ok: false,
+      error: 'invalid tool name'
+    }
+  }
+
+  const readmeUrl = TOOL_README_URLS[toolName]
+  if (!readmeUrl) {
+    return {
+      ok: false,
+      error: `README URL not configured for tool: ${toolName}`
+    }
+  }
+
+  const openError = await shell.openExternal(readmeUrl)
+  if (openError) {
+    return {
+      ok: false,
+      error: openError
+    }
+  }
+
+  return {
+    ok: true,
+    url: readmeUrl
   }
 })
 
