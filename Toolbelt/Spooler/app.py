@@ -106,6 +106,8 @@ SUPPORTED_INGEST_EXTENSIONS = {
     ".md",
 }
 
+EXAMPLE_SNIPPETS_DIR = ROOT / "payload_probes" / "example_snippets"
+
 SCENARIO_SCHEMA_NAME = "spooler-scenario"
 SCENARIO_SCHEMA_VERSION = 1
 
@@ -653,6 +655,27 @@ def ingest_payload_from_local_path(raw_path: str) -> tuple[bool, str]:
     content = decode_text_bytes(raw)
     apply_payload_source(source_path.name, source_path.stat().st_size, content)
     return True, f"Imported `{source_path}` into payload editor."
+
+
+def load_example_catalog() -> list[dict]:
+    if not EXAMPLE_SNIPPETS_DIR.exists():
+        return []
+    examples = []
+    for f in sorted(EXAMPLE_SNIPPETS_DIR.iterdir()):
+        if f.suffix in SUPPORTED_INGEST_EXTENSIONS and f.is_file():
+            first_doc = ""
+            try:
+                lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+                for line in lines[1:]:
+                    stripped = line.strip().lstrip("#").lstrip("*").lstrip("/").strip()
+                    if stripped and not stripped.startswith("!"):
+                        first_doc = stripped[:90]
+                        break
+            except OSError:
+                pass
+            stem = f.stem.lstrip("0123456789_").replace("_", " ").title()
+            examples.append({"label": stem, "path": f, "hint": first_doc})
+    return examples
 
 
 def scenario_snapshot() -> dict[str, object]:
@@ -2543,6 +2566,31 @@ uploaded_file = st.file_uploader(
     type=[extension.lstrip(".") for extension in sorted(SUPPORTED_INGEST_EXTENSIONS)],
 )
 sync_uploaded_file(uploaded_file)
+
+_example_catalog = load_example_catalog()
+if _example_catalog:
+    with st.expander("Try an Example", expanded=False):
+        st.caption("Load a ready-made probe snippet into the payload editor. Each example is wired to read SPOOLER environment variables so results change with your scenario settings.")
+        _example_labels = [ex["label"] for ex in _example_catalog]
+        _selected_label = st.selectbox(
+            "Pick an example",
+            options=_example_labels,
+            index=None,
+            placeholder="Choose a probe...",
+            key="example_catalog_select",
+        )
+        _selected_ex = next((ex for ex in _example_catalog if ex["label"] == _selected_label), None)
+        if _selected_ex:
+            st.caption(f"_{_selected_ex['hint']}_")
+        if st.button("Load Example", disabled=_selected_ex is None, key="example_catalog_load"):
+            if _selected_ex:
+                try:
+                    _ex_content = _selected_ex["path"].read_text(encoding="utf-8", errors="replace")
+                    apply_payload_source(_selected_ex["path"].name, len(_ex_content.encode()), _ex_content)
+                    st.success(f"Loaded **{_selected_ex['label']}** into the payload editor.")
+                except OSError as _ex_err:
+                    st.error(f"Could not read example file: {_ex_err}")
+
 maybe_render_guide(
     "File Upload",
     "Imports a source file and syncs it into the payload editor.",
