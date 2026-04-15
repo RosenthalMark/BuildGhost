@@ -2569,11 +2569,16 @@ sync_uploaded_file(uploaded_file)
 
 _example_catalog = load_example_catalog()
 if _example_catalog:
-    with st.expander("Try an Example", expanded=False):
-        st.caption("Load a ready-made probe snippet into the payload editor. Each example is wired to read SPOOLER environment variables so results change with your scenario settings.")
+    _ex_col_spacer, _ex_col_btn = st.columns([3, 1])
+    with _ex_col_btn:
+        if st.button("Try an Example", key="example_catalog_toggle", use_container_width=True):
+            st.session_state["example_panel_open"] = not st.session_state.get("example_panel_open", False)
+            st.session_state["example_catalog_select"] = None
+
+    if st.session_state.get("example_panel_open"):
         _example_labels = [ex["label"] for ex in _example_catalog]
         _selected_label = st.selectbox(
-            "Pick an example",
+            "Pick an example probe",
             options=_example_labels,
             index=None,
             placeholder="Choose a probe...",
@@ -2582,11 +2587,11 @@ if _example_catalog:
         _selected_ex = next((ex for ex in _example_catalog if ex["label"] == _selected_label), None)
         if _selected_ex:
             st.caption(f"_{_selected_ex['hint']}_")
-        if st.button("Load Example", disabled=_selected_ex is None, key="example_catalog_load"):
-            if _selected_ex:
+            if st.button("Load into Editor", key="example_catalog_load"):
                 try:
                     _ex_content = _selected_ex["path"].read_text(encoding="utf-8", errors="replace")
                     apply_payload_source(_selected_ex["path"].name, len(_ex_content.encode()), _ex_content)
+                    st.session_state["example_panel_open"] = False
                     st.success(f"Loaded **{_selected_ex['label']}** into the payload editor.")
                 except OSError as _ex_err:
                     st.error(f"Could not read example file: {_ex_err}")
