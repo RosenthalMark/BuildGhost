@@ -3,6 +3,9 @@ import { playBootSequence } from './src/services/bootManager.js'
 const stageTitle = document.getElementById('stage-title')
 const stageChip = document.getElementById('stage-chip')
 const stageContent = document.getElementById('stage-content')
+const hudShell = document.getElementById('hud-shell')
+const moduleDock = document.getElementById('module-dock')
+const moduleDockToggle = document.getElementById('module-dock-toggle')
 const pollingStatus = document.getElementById('polling-status')
 const selectedStatus = document.getElementById('selected-status')
 const toolHealth = document.getElementById('tool-health')
@@ -30,8 +33,10 @@ if (introVid && staticLogo) {
 }
 
 const POLL_INTERVAL_MS = 2500
+const MODULE_DOCK_STORAGE_KEY = 'ghostops_module_dock_collapsed'
 const DEFAULT_SCRAPE_URL = 'https://testghost.com'
 const SCRAPE_URL_STORAGE_KEY = 'ghostops_scrape_target_url'
+const SPOOLER_UI_URL = 'http://127.0.0.1:8512'
 
 function resolveScrapeTargetUrl(raw) {
   let s = String(raw || '').trim()
@@ -73,6 +78,48 @@ let selectorCaptureBridgeBound = false
 let lastCaptureFingerprint = ''
 let lastCaptureAt = 0
 let launchKeyAnimGen = 0
+const spoolerDependencyState = {
+  checked: false,
+  healthy: false,
+  reason: '',
+  installing: false
+}
+let spoolerWebviewRetryTimer = null
+let spoolerWebviewRetryCount = 0
+const SPOOLER_WEBVIEW_MAX_RETRIES = 20
+const SPOOLER_WEBVIEW_RETRY_MS = 800
+let spoolerHarnessActive = false
+let spoolerHarnessLaunchPending = false
+let moduleDockCollapsed = false
+
+function setModuleDockState(nextCollapsed, options = {}) {
+  const { persist = true } = options
+  const collapsed = Boolean(nextCollapsed)
+  moduleDockCollapsed = collapsed
+
+  if (hudShell) hudShell.classList.toggle('module-dock-collapsed', collapsed)
+  if (moduleDock) moduleDock.classList.toggle('module-dock-collapsed', collapsed)
+  if (moduleDock) moduleDock.classList.toggle('collapsed', collapsed)
+  if (moduleDockToggle) {
+    moduleDockToggle.setAttribute('aria-expanded', String(!collapsed))
+    moduleDockToggle.setAttribute('aria-label', collapsed ? 'Expand Module Dock' : 'Collapse Module Dock')
+  }
+
+  if (persist) {
+    localStorage.setItem(MODULE_DOCK_STORAGE_KEY, collapsed ? '1' : '0')
+  }
+}
+
+function bindModuleDockToggle() {
+  if (!moduleDockToggle) return
+  const stored = localStorage.getItem(MODULE_DOCK_STORAGE_KEY)
+  const collapsed = stored === '1' || stored === 'true'
+  setModuleDockState(collapsed, { persist: false })
+
+  moduleDockToggle.addEventListener('click', () => {
+    setModuleDockState(!moduleDockCollapsed)
+  })
+}
 
 function setLaunchKeyStaticLabel(button, label) {
   launchKeyAnimGen += 1
@@ -276,6 +323,11 @@ const toolConfig = {
     preview: '../Toolbelt/BlackBox/assets/Blackbox-logo.png',
     description: 'BLACKbox conversion runtime is not present. Initialize to scaffold migration adapters and compatibility checks.',
     expectedPath: '../Toolbelt/BlackBox/index.js'
+  },
+  Spooler: {
+    preview: 'assets/core/GHOSTops-terminal-logo-2.png',
+    description: 'SPOOLER harness is not present. Initialize to scaffold the reproducible hostile-environment runtime bridge.',
+    expectedPath: '../Toolbelt/Spooler/index.js'
   }
 }
 
@@ -303,6 +355,16 @@ function setNavSelection() {
 
 function setStageIdentity() {
   const isScrapeHud = activeRoute === 'tool' && activeTool === 'SCRAPEtag'
+  const nixieShell = document.getElementById('nixie-scroller')
+
+  if (nixieShell) {
+    if (activeRoute === 'tool' && activeTool === 'Spooler') {
+      nixieShell.style.setProperty('--nixie-header-skin', 'url("../Toolbelt/Spooler/assets/Spooler_led_scroller.png")')
+    } else {
+      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/modules/scrapetag/scrapetag-selector-display.png")')
+    }
+  }
+
   if (activeRoute === 'docs') {
     if (stageTitle) stageTitle.textContent = 'SYSTEM DOCS'
   } else if (activeRoute === 'config') {
@@ -348,11 +410,96 @@ function updateSelectorHud(alias, selector) {
   updateNixieReadout(`TARGET ACQUIRED :: ${alias} :: ${selector}`)
 }
 
+function setSpoolerSetupPanel(state) {
+  const setup = document.getElementById('spooler-setup')
+  const message = document.getElementById('spooler-setup-message')
+  const pill = document.getElementById('spooler-health-pill')
+  const installBtn = document.getElementById('spooler-install-deps')
+  if (!setup || !message || !pill || !installBtn) return
+
+  setup.hidden = false
+  installBtn.disabled = Boolean(state.installing)
+
+  if (state.installing) {
+    message.textContent = 'Installing Python dependencies via requirements.txt...'
+    pill.textContent = 'installing'
+    return
+  }
+
+  if (!state.checked) {
+    message.textContent = 'Checking Python dependencies...'
+    pill.textContent = 'checking'
+    installBtn.hidden = true
+    return
+  }
+
+  if (state.healthy) {
+    message.textContent = 'Runtime ready. Streamlit and pandas are available for launch.'
+    pill.textContent = 'ready'
+    installBtn.hidden = true
+    return
+  }
+
+  message.textContent = `Dependencies missing: ${state.reason || 'streamlit not installed'}`
+  pill.textContent = 'deps-missing'
+  installBtn.hidden = false
+}
+
+async function refreshSpoolerDependencyStatus({ logMissing = false } = {}) {
+  spoolerDependencyState.checked = false
+  spoolerDependencyState.reason = ''
+  setSpoolerSetupPanel(spoolerDependencyState)
+
+  const response = await window.ghostOps.checkSpoolerHealth()
+  spoolerDependencyState.checked = true
+  spoolerDependencyState.healthy = Boolean(response?.healthy)
+  spoolerDependencyState.reason = String(response?.reason || '').trim()
+  setSpoolerSetupPanel(spoolerDependencyState)
+
+  if (spoolerDependencyState.healthy) {
+    setPollingStatus('spooler ready', true)
+    updateNixieReadout('SPOOLER READY :: DEPENDENCIES VERIFIED')
+  } else {
+    setPollingStatus('spooler deps missing', false)
+    updateNixieReadout('SPOOLER DEPENDENCY CHECK FAILED')
+    if (logMissing) {
+      appendTerminalLine(`[${isoStamp()}] [Spooler] dependencies missing: ${spoolerDependencyState.reason || 'streamlit not installed'}`)
+    }
+  }
+
+  return { ...spoolerDependencyState }
+}
+
 function setPollingStatus(text, isHealthy) {
   if (pollingStatus) pollingStatus.textContent = text
   if (toolHealth) toolHealth.textContent = text
   if (toolHealth) toolHealth.classList.toggle('status-good', Boolean(isHealthy))
   if (toolHealth) toolHealth.classList.toggle('status-bad', !isHealthy)
+}
+
+function clearSpoolerWebviewRetry() {
+  if (spoolerWebviewRetryTimer) {
+    clearTimeout(spoolerWebviewRetryTimer)
+    spoolerWebviewRetryTimer = null
+  }
+}
+
+function scheduleSpoolerWebviewRetry(webview, reason = '') {
+  if (!webview) return
+  if (spoolerWebviewRetryCount >= SPOOLER_WEBVIEW_MAX_RETRIES) {
+    appendTerminalLine(`[${isoStamp()}] [Spooler] UI attach timeout after ${SPOOLER_WEBVIEW_MAX_RETRIES} retries`)
+    updateNixieReadout('SPOOLER UI TIMEOUT :: CHECK STREAMLIT PORT')
+    return
+  }
+  spoolerWebviewRetryCount += 1
+  clearSpoolerWebviewRetry()
+  if (spoolerWebviewRetryCount === 1) {
+    appendTerminalLine(`[${isoStamp()}] [Spooler] waiting for UI server to become ready${reason ? ` (${reason})` : ''}`)
+  }
+  spoolerWebviewRetryTimer = setTimeout(() => {
+    webview.src = SPOOLER_UI_URL
+    appendTerminalLine(`[${isoStamp()}] [Spooler] retrying UI attach (${spoolerWebviewRetryCount}/${SPOOLER_WEBVIEW_MAX_RETRIES})`)
+  }, SPOOLER_WEBVIEW_RETRY_MS)
 }
 
 function cloneTemplate(id) {
@@ -381,6 +528,8 @@ function appendTerminalLine(text) {
       }
     } else if (line.includes('[SCRAPEtag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
       updateNixieReadout(line.replace(/^\[[^\]]+\]\s*/, '').trim())
+    } else if (line.includes('[Spooler]') && line.toLowerCase().includes('streamlit exited')) {
+      spoolerHarnessActive = false
     }
 
     const safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -883,6 +1032,44 @@ function launchScrapeSession() {
   }
 }
 
+async function launchEnvHarness(toolInfo = null, { auto = false } = {}) {
+  const spoolerShellMounted = document.getElementById('spooler-shell')
+  const spoolerWebview = document.getElementById('spooler-webview')
+  if (!spoolerShellMounted || !spoolerWebview) {
+    appendTerminalLine(`[${isoStamp()}] [Spooler] webview container unavailable`)
+    return
+  }
+
+  if (spoolerHarnessLaunchPending) {
+    return
+  }
+
+  if (spoolerHarnessActive && spoolerWebview.src === SPOOLER_UI_URL) {
+    return
+  }
+
+  spoolerHarnessLaunchPending = true
+  try {
+    const health = await refreshSpoolerDependencyStatus({ logMissing: !auto })
+    if (!health.healthy) {
+      if (!auto) {
+        appendTerminalLine(`[${isoStamp()}] [Spooler] launch blocked until dependencies are installed`)
+      }
+      return
+    }
+
+    spoolerWebviewRetryCount = 0
+    clearSpoolerWebviewRetry()
+    window.ghostOps.launchTool('Spooler')
+    spoolerHarnessActive = true
+    spoolerShellMounted.hidden = false
+    spoolerWebview.src = SPOOLER_UI_URL
+    appendTerminalLine(`[${isoStamp()}] [Spooler] loading UI at ${SPOOLER_UI_URL}`)
+  } finally {
+    spoolerHarnessLaunchPending = false
+  }
+}
+
 function attachPreviewFallback(img) {
   img.addEventListener('error', () => {
     img.alt = 'Preview GIF unavailable on disk'
@@ -968,21 +1155,28 @@ function renderRunnerState(toolName, toolInfo) {
   // Contract: tactical-runner-template uses #launch-scrape-btn (image control), not legacy #launch-engine.
   const launchBtn = view.querySelector('#launch-scrape-btn')
   const scrapeShell = view.querySelector('#scrape-shell')
+  const spoolerShell = view.querySelector('#spooler-shell')
   const runnerChip = view.querySelector('.runner-chip')
 
   if (terminalLogBuffer.length === 0) {
     appendTerminalLine(`[${isoStamp()}] ${toolName} entrypoint discovered`)
     appendTerminalLine(`[${isoStamp()}] runner idle`)
-    appendTerminalLine(`[${isoStamp()}] note: SCRAPEtag now runs inside the app window`)
+    appendTerminalLine(`[${isoStamp()}] note: module runtime telemetry bridged into tactical stage`)
   }
 
   const scrapeOnlyNodes = Array.from(view.querySelectorAll('[data-scrapetag-only]'))
   if (toolName === 'SCRAPEtag') {
     if (runnerChip) runnerChip.textContent = 'in-app-ready'
+    if (spoolerShell) spoolerShell.remove()
   } else {
-    if (runnerChip) runnerChip.textContent = 'headful-ready'
     if (scrapeShell) scrapeShell.remove()
     scrapeOnlyNodes.forEach((node) => node.remove())
+    if (toolName === 'Spooler') {
+      if (runnerChip) runnerChip.textContent = 'streamlit-ready'
+    } else {
+      if (runnerChip) runnerChip.textContent = 'headful-ready'
+      if (spoolerShell) spoolerShell.remove()
+    }
   }
 
   if (launchBtn) {
@@ -990,7 +1184,10 @@ function renderRunnerState(toolName, toolInfo) {
       appendTerminalLine(`[${isoStamp()}] launch requested for ${toolName} at ${toolInfo.entryPath}`)
       if (toolName === 'SCRAPEtag') {
         launchScrapeSession()
+      } else if (toolName === 'Spooler') {
+        launchEnvHarness(toolInfo, { auto: false })
       } else {
+        spoolerHarnessActive = false
         window.ghostOps.launchTool(toolName)
       }
     })
@@ -1003,6 +1200,8 @@ function renderRunnerState(toolName, toolInfo) {
   if (launchMounted) {
     if (toolName === 'SCRAPEtag') {
       initLaunchSpacebarKey(launchMounted, { label: 'LAUNCH IN-APP SCRAPE', enableCycle: true })
+    } else if (toolName === 'Spooler') {
+      setLaunchKeyStaticLabel(launchMounted, 'LAUNCH ENV HARNESS')
     } else {
       setLaunchKeyStaticLabel(launchMounted, 'LAUNCH HEADFUL ENGINE')
     }
@@ -1020,6 +1219,70 @@ function renderRunnerState(toolName, toolInfo) {
         }
       })
     }
+  }
+
+  if (toolName === 'Spooler') {
+    const setup = document.getElementById('spooler-setup')
+    const installBtn = document.getElementById('spooler-install-deps')
+    if (setup) setup.hidden = false
+    if (installBtn && !installBtn.dataset.bound) {
+      installBtn.dataset.bound = '1'
+      installBtn.addEventListener('click', async () => {
+        spoolerDependencyState.installing = true
+        setSpoolerSetupPanel(spoolerDependencyState)
+        appendTerminalLine(`[${isoStamp()}] [Spooler] dependency install requested`)
+
+        const result = await window.ghostOps.installSpoolerDeps()
+        spoolerDependencyState.installing = false
+        setSpoolerSetupPanel(spoolerDependencyState)
+
+        if (!result?.ok) {
+          appendTerminalLine(`[${isoStamp()}] [Spooler] dependency install failed: ${result?.error || 'unknown error'}`)
+          return
+        }
+
+        appendTerminalLine(`[${isoStamp()}] [Spooler] dependency install completed`)
+        await refreshSpoolerDependencyStatus({ logMissing: false })
+      })
+    }
+
+    const spoolerShellMounted = document.getElementById('spooler-shell')
+    const spoolerWebview = document.getElementById('spooler-webview')
+    if (spoolerShellMounted) spoolerShellMounted.hidden = true
+    if (spoolerWebview) {
+      if (!spoolerWebview.dataset.bound) {
+        spoolerWebview.dataset.bound = '1'
+        spoolerWebview.addEventListener('did-start-loading', () => {
+          appendTerminalLine(`[${isoStamp()}] [Spooler] webview loading started`)
+        })
+        spoolerWebview.addEventListener('did-stop-loading', () => {
+          clearSpoolerWebviewRetry()
+          spoolerWebviewRetryCount = 0
+          spoolerHarnessActive = true
+          appendTerminalLine(`[${isoStamp()}] [Spooler] webview loading complete`)
+          updateNixieReadout('SPOOLER UI ONLINE :: BIG-SCREEN LINKED')
+        })
+        spoolerWebview.addEventListener('did-fail-load', (event) => {
+          appendTerminalLine(`[${isoStamp()}] [Spooler] webview load failed: ${event.errorDescription}`)
+          const code = Number(event?.errorCode)
+          if (code === -102 || code === -105 || code === -106) {
+            scheduleSpoolerWebviewRetry(spoolerWebview, event.errorDescription || 'connection issue')
+          } else {
+            spoolerHarnessActive = false
+          }
+        })
+      }
+    }
+    refreshSpoolerDependencyStatus({ logMissing: false }).then((health) => {
+      if (health.healthy) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            launchEnvHarness(toolInfo, { auto: true })
+          })
+        })
+      }
+    })
+    appendTerminalLine(`[${isoStamp()}] [Spooler] press LAUNCH ENV HARNESS after dependency check completes`)
   }
 
   // PAUSE / RESUME toggle
@@ -1210,7 +1473,7 @@ function renderWelcomeScreen() {
   const wrap = document.createElement('div')
   wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:24px;padding:24px;'
 
-  // Main-stage loading theater (ghost at computer / multi-beat placeholder) — separate from sidebar GHOSTops-startup-sequence.mp4.
+  // Main-stage loading theater (ghost at computer / multi-beat placeholder) — separate from Module Dock GHOSTops-startup-sequence.mp4.
   const hero = document.createElement('video')
   hero.className = 'welcome-hero-video'
   hero.src = 'assets/modules/scrapetag/ghost-crawler-idle.mp4'
@@ -1289,6 +1552,7 @@ async function boot() {
     console.error('[renderer] ghostOps bridge not available')
     return
   }
+  bindModuleDockToggle()
   bindToolLogs()
   bindNavigation()
   setNavSelection()

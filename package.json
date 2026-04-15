@@ -4,6 +4,7 @@
   "description": "> **SYSTEM OVERVIEW:** A centralized GHOSTops-powered ecosystem for high-stakes software delivery. Engineered to replace legacy friction with bulletproof release gates and intelligent automation.",
   "main": "index.js",
   "scripts": {
+    "start": "npm --prefix ghostops-terminal start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

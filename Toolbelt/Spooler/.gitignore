@@ -1,0 +1,27 @@
+# Python / virtual env
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local secrets / env
+.env
+.env.*
+.streamlit/secrets.toml
+
+# Logs and runtime noise
+*.log
+*.pid
+logs/*
+!logs/.gitkeep
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated SPOOLER artifacts
+recipes/spool-*.yml
+injections/spool-*/

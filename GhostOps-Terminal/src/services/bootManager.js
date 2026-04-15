@@ -13,8 +13,17 @@ const moduleBootConfig = {
   BlackBox: {
     video: 'assets/modules/blackbox/blackbox-boot.mp4',
     color: '#b8ff5a'
+  },
+  Spooler: {
+    video: 'assets/core/GHOSTops-startup-sequence.mp4',
+    color: '#b8ff5a'
   }
 }
+
+const DEFAULT_BOOT_CONFIG = Object.freeze({
+  video: 'assets/core/GHOSTops-startup-sequence.mp4',
+  color: '#b8ff5a'
+})
 
 const SKIP_BOOT_KEY = 'ghostops_skip_boot_sequences'
 const moduleBootCounts = JSON.parse(localStorage.getItem('ghostops_boot_counts') || '{}')
@@ -22,9 +31,9 @@ const NUDGE_DELAY_MS = 5000
 
 export function playBootSequence(toolName, stageContent, onComplete) {
   const skipBoot = localStorage.getItem(SKIP_BOOT_KEY) === '1'
-  const config = moduleBootConfig[toolName]
+  const config = moduleBootConfig[toolName] || DEFAULT_BOOT_CONFIG
 
-  if (skipBoot || !config) {
+  if (skipBoot) {
     onComplete()
     return
   }

@@ -5,7 +5,7 @@ Intelligent DOM mapping helper: capture interactive elements, assign human-reada
 ## Two run modes
 
 1. **GHOSTops Terminal (recommended for demos)**  
-   Open `GhostOps-Terminal`, select **SCRAPEtag**, set **TARGET URL** (http/https; bare domains get `https://` prepended), then click **Launch In-App Scrape** or press **Enter** in the field. The last successful URL is stored in `localStorage` under `ghostops_scrape_target_url`. The embedded webview loads that site; click an element, enter an alias in the modal, then confirm. Captures appear in the selector HUD, Nixie ticker, and terminal log as `[CAPTURED] alias -> selector`.
+   Open `ghostops-terminal`, select **SCRAPEtag**, set **TARGET URL** (http/https; bare domains get `https://` prepended), then click **Launch In-App Scrape** or press **Enter** in the field. The last successful URL is stored in `localStorage` under `ghostops_scrape_target_url`. The embedded webview loads that site; click an element, enter an alias in the modal, then confirm. Captures appear in the selector HUD, Nixie ticker, and terminal log as `[CAPTURED] alias -> selector`.
 
 2. **Standalone Playwright**  
    From this directory:
@@ -26,7 +26,7 @@ Intelligent DOM mapping helper: capture interactive elements, assign human-reada
 ## Contract
 
 - Entry file: `index.js` (must exist for the Terminal “module online” check).
-- Renderer talks to the page only through the webview injection in `GhostOps-Terminal/renderer.js` (`armScrapeTagger`); there is no Node access in the UI process.
+- Renderer talks to the page only through the webview injection in `ghostops-terminal/renderer.js` (`armScrapeTagger`); there is no Node access in the UI process.
 
 ## Known limits
 

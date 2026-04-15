@@ -17,7 +17,7 @@
 
 ## Current Status
 - The runtime entrypoint exists at `Toolbelt/GHOSTstub/index.js`.
-- UI slot and boot sequence path are wired in `GhostOps-Terminal`.
+- UI slot and boot sequence path are wired in `ghostops-terminal`.
 - Full stubbing engine implementation is still pending.
 
 ## Near-Term Feature Targets

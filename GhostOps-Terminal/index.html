@@ -10,15 +10,14 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="hud-shell">
-      <aside class="sidebar panel-frame">
-        <header class="sidebar-header" id="logo-container">
-          <video id="intro-vid" src="./assets/core/GHOSTops-startup-sequence.mp4" autoplay muted playsinline></video>
-          <img id="static-logo" src="./assets/core/GHOSTops-terminal-logo-2.png" alt="GHOSTops Logo" style="display: none;" />
+    <div id="hud-shell" class="hud-shell">
+      <aside id="module-dock" class="module-dock panel-frame">
+        <header class="module-dock-header" id="logo-container">
+          <img id="static-logo" src="./assets/core/GHOSTops-terminal-logo-2.png" alt="GHOSTops Logo" style="display: block;" />
         </header>
 
         <nav class="tool-nav" aria-label="Tool Navigation">
-          <div class="sidebar-label" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px; border-bottom: 1px solid rgb(184 255 90 / 0.15); padding-bottom: 6px;">Operational Modules</div>
+          <div class="module-dock-label" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px; border-bottom: 1px solid rgb(184 255 90 / 0.15); padding-bottom: 6px;">Operational Modules</div>
           <button class="nav-item module-slot active" data-route="tool" data-tool="SCRAPEtag">
             <span class="nav-logo-wrap">
               <img class="nav-tool-logo" src="../Toolbelt/SCRAPEtag/assets/SCRAPEtag-logo.png" alt="SCRAPEtag" />
@@ -40,14 +39,22 @@
             </span>
             <span class="nav-meta">Migration Core</span>
           </button>
+          <button class="nav-item module-slot" data-route="tool" data-tool="Spooler">
+            <span class="nav-logo-wrap">
+              <span class="nav-text-logo">SPOOLER</span>
+              <span class="nav-text-sub">ENV HARNESS</span>
+              <span class="tool-live-dot" aria-hidden="true"></span>
+            </span>
+            <span class="nav-meta">Reproducible Environment Harness</span>
+          </button>
           <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
-          <div class="sidebar-fillers" style="opacity: 0.4; margin-top: 10px;">
+          <div class="module-dock-fillers" style="opacity: 0.4; margin-top: 10px;">
             <div class="nav-item module-slot future-placeholder" style="cursor: default; border-style: dashed;"><span class="nav-name">FUTURE BUILDGHOST</span></div>
           </div>
         </nav>
 
-        <div class="sidebar-anchors panel-inner">
+        <div class="module-dock-anchors panel-inner">
           <button class="nav-item nav-anchor-btn" id="nav-settings" data-route="config">
             <span class="nav-logo-wrap">
               <span class="nav-name nav-anchor-label">[ SETTINGS ]</span>
@@ -65,7 +72,7 @@
           </button>
         </div>
 
-        <footer class="sidebar-footer panel-inner">
+        <footer class="module-dock-footer panel-inner">
           <div>
             <p class="stat-label">Polling</p>
             <p id="polling-status" class="stat-value">standby</p>
@@ -76,6 +83,17 @@
           </div>
         </footer>
       </aside>
+      <button
+        id="module-dock-toggle"
+        class="module-dock-toggle"
+        type="button"
+        aria-label="Collapse Module Dock"
+        aria-controls="module-dock"
+        aria-expanded="true"
+      >
+        <span class="module-dock-toggle-hitbox" aria-hidden="true"></span>
+        <span id="module-dock-toggle-icon" class="module-dock-toggle-icon" aria-hidden="true"></span>
+      </button>
 
       <main class="stage-wrap panel-frame">
         <header id="tactical-stage-header" class="stage-header panel-inner">
@@ -173,6 +191,16 @@
               placeholder="https://example.com"
             />
           </div>
+          <section id="spooler-setup" class="spooler-setup" hidden>
+            <div class="spooler-setup-head">
+              <p class="spooler-setup-title">Spooler Runtime Check</p>
+              <span id="spooler-health-pill" class="runner-chip">checking</span>
+            </div>
+            <p id="spooler-setup-message" class="spooler-setup-message">Checking Python dependencies...</p>
+            <div class="spooler-setup-actions">
+              <button id="spooler-install-deps" class="primary-action" type="button">INSTALL MISSING DEPENDENCIES</button>
+            </div>
+          </section>
 
           <section id="scrape-shell" class="scrape-shell" hidden>
             <webview
@@ -180,6 +208,15 @@
               class="scrape-webview"
               src="about:blank"
               partition="persist:ghostops-scrape"
+              allowpopups="false"
+            ></webview>
+          </section>
+          <section id="spooler-shell" class="scrape-shell" hidden>
+            <webview
+              id="spooler-webview"
+              class="scrape-webview"
+              src="about:blank"
+              partition="persist:ghostops-spooler"
               allowpopups="false"
             ></webview>
           </section>

@@ -15,7 +15,7 @@ Toolbelt/
     index.js              ← REQUIRED: module entry point
     assets/
       yourmodule-boot.mp4 ← REQUIRED: boot sequence video (16:9, max 15s)
-      yourmodule-logo.png ← REQUIRED: sidebar logo (recommended 480x120px)
+      yourmodule-logo.png ← REQUIRED: Module Dock logo (recommended 480x120px)
     README.md             ← REQUIRED: module documentation
 ```
 
@@ -64,8 +64,8 @@ const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'YourModuleName'])
 
 ### 5. Drop your boot video and logo into the assets folder
 ```
-GhostOps-Terminal/assets/modules/yourmodulename/yourmodule-boot.mp4
-GhostOps-Terminal/assets/modules/yourmodulename/yourmodule-logo.png
+ghostops-terminal/assets/modules/yourmodulename/yourmodule-boot.mp4
+ghostops-terminal/assets/modules/yourmodulename/yourmodule-logo.png
 ```
 
 That's it. Zero new logic. Zero new functions. The Terminal handles the rest.

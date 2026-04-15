@@ -4,11 +4,14 @@ const fs = require('fs')
 const { spawn } = require('child_process')
 
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
-const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'BlackBox'])
+const SPOOLER_APP_ROOT = path.join(TOOL_ROOT, 'Spooler')
+const SPOOLER_VENV_PYTHON = path.join(SPOOLER_APP_ROOT, 'venv', 'bin', 'python')
+const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'BlackBox', 'Spooler'])
 const TOOL_README_URLS = Object.freeze({
   BlackBox: 'https://github.com/RosenthalMark/BuildGhost/blob/main/Toolbelt/BlackBox/README.md'
 })
 let activeToolProcess = null
+let spoolerInstallProcess = null
 const currentSessionLogs = []
 
 function renderLogStamp(rawIso) {
@@ -33,6 +36,56 @@ function sanitizeToolName(toolName) {
 
 function toolEntryPath(toolName) {
   return path.join(TOOL_ROOT, toolName, 'index.js')
+}
+
+function resolveSpoolerPython() {
+  return fs.existsSync(SPOOLER_VENV_PYTHON) ? SPOOLER_VENV_PYTHON : 'python3'
+}
+
+function runCapture(command, args, options = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env || process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+
+    child.on('error', (error) => {
+      if (settled) return
+      settled = true
+      resolve({
+        ok: false,
+        code: -1,
+        stdout,
+        stderr,
+        error: error.message
+      })
+    })
+
+    child.on('close', (code) => {
+      if (settled) return
+      settled = true
+      resolve({
+        ok: code === 0,
+        code: typeof code === 'number' ? code : 1,
+        stdout,
+        stderr,
+        error: ''
+      })
+    })
+  })
 }
 
 function createWindow() {
@@ -145,6 +198,111 @@ ipcMain.handle('ghostops:open-tool-readme', async (_event, rawToolName) => {
     ok: true,
     url: readmeUrl
   }
+})
+
+ipcMain.handle('ghostops:spooler-health', async () => {
+  if (!fs.existsSync(SPOOLER_APP_ROOT)) {
+    return {
+      ok: false,
+      healthy: false,
+      reason: 'spooler app folder missing',
+      appRoot: SPOOLER_APP_ROOT
+    }
+  }
+
+  const spoolerPython = resolveSpoolerPython()
+  const probe = await runCapture(
+    spoolerPython,
+    ['-c', 'import streamlit, pandas; print("deps:ok")'],
+    { cwd: SPOOLER_APP_ROOT, env: process.env }
+  )
+
+  if (probe.ok) {
+    return {
+      ok: true,
+      healthy: true,
+      reason: 'dependencies installed'
+    }
+  }
+
+  const message = `${probe.stderr}\n${probe.stdout}`.trim()
+  return {
+    ok: false,
+    healthy: false,
+    reason: message || 'dependency check failed',
+    installCommand: `cd ~/Desktop/REPOS/BuildGhost/Toolbelt/Spooler && ${spoolerPython} -m pip install -r requirements.txt`
+  }
+})
+
+ipcMain.handle('ghostops:spooler-install-deps', async (event) => {
+  if (!fs.existsSync(SPOOLER_APP_ROOT)) {
+    return {
+      ok: false,
+      error: `missing app folder: ${SPOOLER_APP_ROOT}`
+    }
+  }
+
+  const requirementsPath = path.join(SPOOLER_APP_ROOT, 'requirements.txt')
+  if (!fs.existsSync(requirementsPath)) {
+    return {
+      ok: false,
+      error: `requirements.txt missing: ${requirementsPath}`
+    }
+  }
+
+  if (spoolerInstallProcess && !spoolerInstallProcess.killed) {
+    return {
+      ok: false,
+      error: 'dependency install already running'
+    }
+  }
+
+  const spoolerPython = resolveSpoolerPython()
+  event.sender.send('tool-log', '[Spooler] installing dependencies from Toolbelt/Spooler/requirements.txt')
+
+  return new Promise((resolve) => {
+    spoolerInstallProcess = spawn(spoolerPython, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
+      cwd: SPOOLER_APP_ROOT,
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: '1'
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    const proc = spoolerInstallProcess
+
+    proc.stdout.on('data', (chunk) => {
+      event.sender.send('tool-log', `[Spooler] ${chunk.toString()}`)
+    })
+
+    proc.stderr.on('data', (chunk) => {
+      event.sender.send('tool-log', `[Spooler] ${chunk.toString()}`)
+    })
+
+    proc.on('error', (error) => {
+      event.sender.send('tool-log', `[Spooler] dependency install failed: ${error.message}`)
+      if (spoolerInstallProcess === proc) {
+        spoolerInstallProcess = null
+      }
+      resolve({
+        ok: false,
+        error: error.message
+      })
+    })
+
+    proc.on('close', (code) => {
+      event.sender.send('tool-log', `[Spooler] dependency install finished (code=${code})`)
+      if (spoolerInstallProcess === proc) {
+        spoolerInstallProcess = null
+      }
+      resolve({
+        ok: code === 0,
+        code: typeof code === 'number' ? code : 1,
+        error: code === 0 ? '' : 'pip install failed'
+      })
+    })
+  })
 })
 
 ipcMain.on('launch-tool', (event, rawToolName) => {

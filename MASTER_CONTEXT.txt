@@ -3,7 +3,7 @@ DIRECTORY TREE:
 .
 |____MASTER_CONTEXT.txt
 |____LICENSE
-|____GhostOps-Terminal
+|____ghostops-terminal
 | |____README.md
 |____Toolbelt
 | |____SCRAPEtag
@@ -25,8 +25,8 @@ DIRECTORY TREE:
 |____package.json
 
 --- FILE CONTENTS ---
--e \nFILE_PATH: ./GhostOps-Terminal/README.md
--e \nFILE_PATH: ./GhostOps-Terminal/README.md
+-e \nFILE_PATH: ./ghostops-terminal/README.md
+-e \nFILE_PATH: ./ghostops-terminal/README.md
 ------------------------------------------------
 ------------------------------------------------
 PLACEHOLDERPLACEHOLDER-e -e \n------------------------------------------------

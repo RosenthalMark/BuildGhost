@@ -1,0 +1,36 @@
+name: spooler-ci-execution
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-scenario:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build target image
+        run: ./scripts/build-target-agent-image.sh
+
+      - name: Execute deterministic CI scenario
+        run: |
+          python3 scripts/ci_run.py \
+            --run-id "spool-ci-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --payload payload_probes/templates/python_retry_probe.py \
+            --network-profile 3g_degraded \
+            --latency-ms 180 \
+            --packet-loss-pct 8 \
+            --cpu-budget 2 \
+            --memory-budget 1g \
+            --third-party-outage \
+            --chaos-mode \
+            --artifact-dir logs/ci
+
+      - name: Upload CI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spooler-ci-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/ci
+          if-no-files-found: warn

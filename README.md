@@ -4,6 +4,48 @@
 
 ---
 
+### QUICK START
+
+#### Install Dependencies
+
+```bash
+# root repo dependencies
+npm install
+
+# GhostOps Terminal app dependencies
+cd ghostops-terminal
+npm install
+```
+
+#### Run GhostOps Terminal
+
+```bash
+cd ghostops-terminal
+npm start
+```
+
+#### Ghost CMS Lifecycle Commands (Optional)
+
+Run these from your Ghost install directory:
+
+```bash
+ghost start
+ghost stop
+ghost restart
+ghost status
+```
+
+If configured in your shell, helper command:
+
+```bash
+ghostops start
+ghostops stop
+ghostops restart
+ghostops status
+```
+
+---
+
 ### THE PROBLEM
 Modern software delivery is crippled by **brittle automation** and **reactive quality gates**. Traditional QA suites rely on static selectors and manual oversight, leading to high maintenance costs, flaky pipelines, and a lack of confidence at the moment of deployment. As systems scale, the "Test Debt" eventually outpaces feature development.
 
@@ -33,6 +75,10 @@ A tactical stubbing layer for stabilizing QA workflows when upstream APIs are un
 
 #### `PROJECT BLACKBOX // RELEASE INTELLIGENCE CORE`
 A release intelligence and test migration module that correlates execution signals while enabling push-button framework conversion across suites (for example `Selenium -> Playwright` and `Cypress -> Playwright`). PROJECT BLACKBOX is designed to reduce rewrite cost, preserve intent, and accelerate safer modernization of legacy automation stacks.
+* **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
+
+#### `SPOOLER // HOSTILE ENVIRONMENT RUNNER`
+A local-first hostile-environment harness that turns a scenario config and probe payload into reproducible Docker artifacts. SPOOLER applies real runtime pressure — CPU/memory limits, netem latency/loss, fault injection, and third-party outage simulation — and surfaces pass/fail results with full logs in both the app and CI pipelines. Plugs directly into GHOSTops Terminal as an embedded Streamlit webview.
 * **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
 
 ---
