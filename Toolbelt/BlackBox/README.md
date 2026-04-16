@@ -17,7 +17,7 @@
 5. Emit translated suites, compatibility reports, and verification checkpoints.
 
 ## Intended Module Interop
-- `SCRAPEtag` provides resilient selectors and interaction alias maps.
+- `Scrapetag` provides resilient selectors and interaction alias maps.
 - `GHOSTstub` provides deterministic payload scenarios for repeatable validation.
 - `BLACKbox` consumes both to increase translation fidelity and reduce flaky post-migration behavior.
 

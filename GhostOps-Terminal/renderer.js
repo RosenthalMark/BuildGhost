@@ -65,7 +65,7 @@ function resolveScrapeTargetUrl(raw) {
 }
 
 let activeRoute = 'tool'
-let activeTool = 'SCRAPEtag'
+let activeTool = 'scrapetag'
 let lastCapturedAlias = ''
 let pollTimer = null
 let terminalLogNode = null
@@ -309,10 +309,10 @@ function initLaunchSpacebarKey(button, options = {}) {
 }
 
 const toolConfig = {
-  SCRAPEtag: {
+  scrapetag: {
     preview: 'assets/modules/scrapetag/scrapetag-selector-display.png',
-    description: 'SCRAPEtag module was not discovered in Toolbelt. Initialize to scaffold runtime files and bridge contracts.',
-    expectedPath: '../Toolbelt/SCRAPEtag/index.js'
+    description: 'Scrapetag module was not discovered in Toolbelt. Initialize to scaffold runtime files and bridge contracts.',
+    expectedPath: '../Toolbelt/scrapetag/index.js'
   },
   GHOSTstub: {
     preview: '../Toolbelt/GHOSTstub/assets/ghostStub-logo.png',
@@ -354,7 +354,7 @@ function setNavSelection() {
 }
 
 function setStageIdentity() {
-  const isScrapeHud = activeRoute === 'tool' && activeTool === 'SCRAPEtag'
+  const isScrapeHud = activeRoute === 'tool' && activeTool === 'scrapetag'
   const nixieShell = document.getElementById('nixie-scroller')
 
   if (nixieShell) {
@@ -372,7 +372,7 @@ function setStageIdentity() {
   } else if (activeRoute === 'auth') {
     if (stageTitle) stageTitle.textContent = 'SIGN IN'
   } else if (isScrapeHud && lastCapturedAlias) {
-    if (stageTitle) stageTitle.textContent = `SCRAPEtag :: ${lastCapturedAlias}`
+    if (stageTitle) stageTitle.textContent = `Scrapetag :: ${lastCapturedAlias}`
   } else {
     if (stageTitle) stageTitle.textContent = activeTool
   }
@@ -526,7 +526,7 @@ function appendTerminalLine(text) {
       if (cap) {
         updateNixieReadout(`CAPTURE :: ${cap[1].trim()} :: ${cap[2].trim()}`)
       }
-    } else if (line.includes('[SCRAPEtag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
+    } else if (line.includes('[scrapetag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
       updateNixieReadout(line.replace(/^\[[^\]]+\]\s*/, '').trim())
     } else if (line.includes('[Spooler]') && line.toLowerCase().includes('streamlit exited')) {
       spoolerHarnessActive = false
@@ -559,7 +559,7 @@ function parseScrapeCaptureMessage(message) {
     return null
   }
 
-  const marker = '[SCRAPEtag:capture]'
+  const marker = '[scrapetag:capture]'
   if (!message.startsWith(marker)) {
     return null
   }
@@ -575,7 +575,7 @@ function parseScrapeCaptureMessage(message) {
 function normalizeScrapeCapture(payload) {
   const alias = typeof payload?.alias === 'string' ? payload.alias.trim() : ''
   const selector = typeof payload?.selector === 'string' ? payload.selector.trim() : ''
-  const toolName = typeof payload?.toolName === 'string' && payload.toolName.trim() ? payload.toolName.trim() : 'SCRAPEtag'
+  const toolName = typeof payload?.toolName === 'string' && payload.toolName.trim() ? payload.toolName.trim() : 'scrapetag'
   const timestamp = typeof payload?.timestamp === 'string' && payload.timestamp.trim() ? payload.timestamp.trim() : new Date().toISOString()
 
   if (!alias || !selector) {
@@ -794,7 +794,7 @@ async function armScrapeTagger(webview) {
             cancelEvent.preventDefault()
             cancelEvent.stopPropagation()
             cleanup()
-            console.log('[SCRAPEtag] tagger cancelled')
+            console.log('[scrapetag] tagger cancelled')
           }
 
           const finishTagging = () => {
@@ -802,7 +802,7 @@ async function armScrapeTagger(webview) {
 
             if (!name) {
               cleanup()
-              console.log('[SCRAPEtag] tagger aborted')
+              console.log('[scrapetag] tagger aborted')
               return
             }
 
@@ -831,7 +831,7 @@ async function armScrapeTagger(webview) {
             const payload = {
               alias: name,
               selector,
-              toolName: 'SCRAPEtag',
+              toolName: 'scrapetag',
               timestamp: new Date().toISOString()
             }
 
@@ -843,7 +843,7 @@ async function armScrapeTagger(webview) {
               window.postMessage({ type: 'selector-captured', payload }, '*')
             } catch {}
 
-            console.log('[SCRAPEtag:capture]' + JSON.stringify(payload))
+            console.log('[scrapetag:capture]' + JSON.stringify(payload))
           }
 
           // TAG TARGET button
@@ -872,7 +872,7 @@ async function armScrapeTagger(webview) {
               overlayEvent.preventDefault()
               overlayEvent.stopPropagation()
               cleanup()
-              console.log('[SCRAPEtag] tagger dismissed via backdrop')
+              console.log('[scrapetag] tagger dismissed via backdrop')
             }
           })
           // ─────────────────────────────────────────────────────────────────
@@ -885,7 +885,7 @@ async function armScrapeTagger(webview) {
 
         window.__ghostTaggerClickHandler = clickHandler
         document.addEventListener('click', clickHandler, true)
-        console.log('[SCRAPEtag] in-app tagger armed')
+        console.log('[scrapetag] in-app tagger armed')
         return 'armed'
       })()
     `,
@@ -947,11 +947,11 @@ function bindScrapeWebview(webview) {
     } catch {
       /* ignore */
     }
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading started`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] webview loading started`)
   })
 
   webview.addEventListener('did-stop-loading', () => {
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview loading complete`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] webview loading complete`)
     const u = typeof webview.getURL === 'function' ? webview.getURL() : ''
     if (u && u !== 'about:blank') {
       requestAnimationFrame(() => {
@@ -961,7 +961,7 @@ function bindScrapeWebview(webview) {
   })
 
   webview.addEventListener('did-fail-load', (event) => {
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview load failed: ${event.errorDescription}`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] webview load failed: ${event.errorDescription}`)
   })
 
   webview.addEventListener('console-message', (event) => {
@@ -975,12 +975,12 @@ function bindScrapeWebview(webview) {
 
   webview.addEventListener('dom-ready', async () => {
     bindSelectorCaptureBridge()
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] webview ready`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] webview ready`)
     try {
       await armScrapeTagger(webview)
-      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] click an element to tag`)
+      appendTerminalLine(`[${isoStamp()}] [scrapetag] click an element to tag`)
     } catch (error) {
-      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] injector failed: ${error.message}`)
+      appendTerminalLine(`[${isoStamp()}] [scrapetag] injector failed: ${error.message}`)
     }
   })
 }
@@ -992,7 +992,7 @@ function launchScrapeSession() {
   const urlInput = document.getElementById('scrape-target-url')
 
   if (!scrapeShell || !webview) {
-    appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] in-app webview container unavailable`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] in-app webview container unavailable`)
     return
   }
 
@@ -1001,7 +1001,7 @@ function launchScrapeSession() {
   if (rawField) {
     targetUrl = resolveScrapeTargetUrl(rawField)
     if (!targetUrl) {
-      appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] invalid target URL`)
+      appendTerminalLine(`[${isoStamp()}] [scrapetag] invalid target URL`)
       return
     }
   } else {
@@ -1016,7 +1016,7 @@ function launchScrapeSession() {
 
   scrapeShell.hidden = false
   bindScrapeWebview(webview)
-  appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] launching in-app session: ${targetUrl}`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag] launching in-app session: ${targetUrl}`)
   webview.src = targetUrl
 
   if (rearmBtn && rearmBtn.dataset.bound !== '1') {
@@ -1024,9 +1024,9 @@ function launchScrapeSession() {
     rearmBtn.addEventListener('click', async () => {
       try {
         await armScrapeTagger(webview)
-        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] tagger rearmed`)
+        appendTerminalLine(`[${isoStamp()}] [scrapetag] tagger rearmed`)
       } catch (error) {
-        appendTerminalLine(`[${isoStamp()}] [SCRAPEtag] rearm failed: ${error.message}`)
+        appendTerminalLine(`[${isoStamp()}] [scrapetag] rearm failed: ${error.message}`)
       }
     })
   }
@@ -1165,7 +1165,7 @@ function renderRunnerState(toolName, toolInfo) {
   }
 
   const scrapeOnlyNodes = Array.from(view.querySelectorAll('[data-scrapetag-only]'))
-  if (toolName === 'SCRAPEtag') {
+  if (toolName === 'scrapetag') {
     if (runnerChip) runnerChip.textContent = 'in-app-ready'
     if (spoolerShell) spoolerShell.remove()
   } else {
@@ -1182,7 +1182,7 @@ function renderRunnerState(toolName, toolInfo) {
   if (launchBtn) {
     launchBtn.addEventListener('click', async () => {
       appendTerminalLine(`[${isoStamp()}] launch requested for ${toolName} at ${toolInfo.entryPath}`)
-      if (toolName === 'SCRAPEtag') {
+      if (toolName === 'scrapetag') {
         launchScrapeSession()
       } else if (toolName === 'Spooler') {
         launchEnvHarness(toolInfo, { auto: false })
@@ -1198,7 +1198,7 @@ function renderRunnerState(toolName, toolInfo) {
 
   const launchMounted = document.getElementById('launch-scrape-btn')
   if (launchMounted) {
-    if (toolName === 'SCRAPEtag') {
+    if (toolName === 'scrapetag') {
       initLaunchSpacebarKey(launchMounted, { label: 'LAUNCH IN-APP SCRAPE', enableCycle: true })
     } else if (toolName === 'Spooler') {
       setLaunchKeyStaticLabel(launchMounted, 'LAUNCH ENV HARNESS')
@@ -1207,7 +1207,7 @@ function renderRunnerState(toolName, toolInfo) {
     }
   }
 
-  if (toolName === 'SCRAPEtag') {
+  if (toolName === 'scrapetag') {
     const urlField = document.getElementById('scrape-target-url')
     if (urlField) {
       const stored = localStorage.getItem(SCRAPE_URL_STORAGE_KEY)
@@ -1290,7 +1290,7 @@ function renderRunnerState(toolName, toolInfo) {
   const pauseImg = document.getElementById('pause-resume-img')
   const pauseLabel = document.getElementById('pause-resume-label')
 
-  if (toolName === 'SCRAPEtag' && pauseBtn && pauseImg && pauseLabel) {
+  if (toolName === 'scrapetag' && pauseBtn && pauseImg && pauseLabel) {
     pauseBtn.addEventListener('click', () => {
       const isRunning = pauseBtn.dataset.state === 'running'
       if (isRunning) {

@@ -59,7 +59,7 @@ const toolConfig = {
 
 ### 4. Add your module to `ALLOWED_TOOLS` in `main.js`
 ```javascript
-const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'YourModuleName'])
+const ALLOWED_TOOLS = new Set(['scrapetag', 'GHOSTstub', 'YourModuleName'])
 ```
 
 ### 5. Drop your boot video and logo into the assets folder
