@@ -203,6 +203,13 @@
           </section>
 
           <section id="scrape-shell" class="scrape-shell" hidden>
+            <nav class="webview-nav-bar" data-scrapetag-only>
+              <button id="wv-back" class="wv-nav-btn" type="button" aria-label="Go back" title="Back">&#8592;</button>
+              <button id="wv-forward" class="wv-nav-btn" type="button" aria-label="Go forward" title="Forward">&#8594;</button>
+              <button id="wv-reload" class="wv-nav-btn" type="button" aria-label="Reload page" title="Reload">&#8635;</button>
+              <span id="wv-current-url" class="wv-current-url"></span>
+              <button id="start-harvest-btn" class="wv-harvest-btn" type="button" aria-label="Start Harvest">[ START HARVEST ]</button>
+            </nav>
             <webview
               id="scrape-webview"
               class="scrape-webview"

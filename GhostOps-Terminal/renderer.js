@@ -973,16 +973,158 @@ function bindScrapeWebview(webview) {
     appendTerminalLine(`[${isoStamp()}] ${event.message}`)
   })
 
-  webview.addEventListener('dom-ready', async () => {
+  webview.addEventListener('dom-ready', () => {
     bindSelectorCaptureBridge()
     appendTerminalLine(`[${isoStamp()}] [scrapetag] webview ready`)
-    try {
-      await armScrapeTagger(webview)
-      appendTerminalLine(`[${isoStamp()}] [scrapetag] click an element to tag`)
-    } catch (error) {
-      appendTerminalLine(`[${isoStamp()}] [scrapetag] injector failed: ${error.message}`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag] click "Start Harvest" to crawl interactive nodes`)
+    const urlDisplay = document.getElementById('wv-current-url')
+    if (urlDisplay) {
+      try {
+        urlDisplay.textContent = webview.getURL()
+      } catch {
+        urlDisplay.textContent = ''
+      }
     }
   })
+}
+
+const INTERACTIVE_NODE_SELECTORS = [
+  'button:not([disabled])',
+  'a[href]',
+  'input:not([type="hidden"]):not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  '[role="tab"]',
+  '[role="checkbox"]',
+  '[role="radio"]',
+  '[role="option"]',
+  '[role="combobox"]',
+  '[role="switch"]',
+  '[onclick]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+const HARVEST_NODE_SCRIPT = `
+(function () {
+  var SELECTORS = ${JSON.stringify(INTERACTIVE_NODE_SELECTORS)};
+
+  function buildSelector(el) {
+    if (el.id) return '#' + el.id;
+    var parts = [];
+    var current = el;
+    while (current && current !== document.documentElement && parts.length < 5) {
+      var tag = current.tagName.toLowerCase();
+      var part = tag;
+      if (current.id) {
+        part = '#' + current.id;
+        parts.unshift(part);
+        break;
+      }
+      var cls = Array.from(current.classList).filter(function(c) { return /^[a-zA-Z_-]/.test(c); }).slice(0, 2);
+      if (cls.length) part += '.' + cls.join('.');
+      if (current.parentElement) {
+        var siblings = Array.from(current.parentElement.children).filter(function(s) { return s.tagName === current.tagName; });
+        if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')';
+      }
+      parts.unshift(part);
+      current = current.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  function getLabel(el) {
+    var label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent || '').trim();
+    return label.length > 80 ? label.slice(0, 80) + '...' : label;
+  }
+
+  function isVisible(el) {
+    var rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  }
+
+  function nodeType(el) {
+    var tag = el.tagName.toLowerCase();
+    if (tag === 'input') return 'input[' + (el.type || 'text') + ']';
+    if (tag === 'a') return 'link';
+    if (tag === 'button' || el.getAttribute('role') === 'button') return 'button';
+    if (tag === 'select') return 'select';
+    if (tag === 'textarea') return 'textarea';
+    var role = el.getAttribute('role');
+    if (role) return 'role[' + role + ']';
+    return tag;
+  }
+
+  var seen = new Set();
+  var nodes = [];
+  try {
+    var matches = document.querySelectorAll(SELECTORS);
+    matches.forEach(function(el) {
+      if (!isVisible(el)) return;
+      var sel = buildSelector(el);
+      if (seen.has(sel)) return;
+      seen.add(sel);
+      var rect = el.getBoundingClientRect();
+      nodes.push({
+        index: nodes.length,
+        type: nodeType(el),
+        selector: sel,
+        label: getLabel(el),
+        rect: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        }
+      });
+    });
+  } catch(e) {
+    nodes.push({ error: e.message });
+  }
+  return nodes;
+})()
+`
+
+async function harvestInteractiveNodes(webview) {
+  const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
+  if (!url || url === 'about:blank') {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no page loaded — launch a session first`)
+    return
+  }
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] crawling: ${url}`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying interactive nodes...`)
+
+  let nodes = []
+  try {
+    nodes = await webview.executeJavaScript(HARVEST_NODE_SCRIPT, true)
+  } catch (err) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] script error: ${err.message}`)
+    return
+  }
+
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no interactive nodes found`)
+    return
+  }
+
+  if (nodes[0]?.error) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] DOM error: ${nodes[0].error}`)
+    return
+  }
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes ──`)
+  nodes.forEach((node) => {
+    const rect = node.rect
+    const coords = `(${rect.x},${rect.y}) ${rect.width}×${rect.height}`
+    const label = node.label ? ` "${node.label}"` : ''
+    appendTerminalLine(`[${isoStamp()}] [${String(node.index).padStart(3, '0')}] ${node.type}${label} | ${coords} | ${node.selector}`)
+  })
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── END REPORT ──`)
 }
 
 function launchScrapeSession() {
@@ -1283,6 +1425,47 @@ function renderRunnerState(toolName, toolInfo) {
       }
     })
     appendTerminalLine(`[${isoStamp()}] [Spooler] press LAUNCH ENV HARNESS after dependency check completes`)
+  }
+
+  if (toolName === 'scrapetag') {
+    const wvBack = document.getElementById('wv-back')
+    const wvForward = document.getElementById('wv-forward')
+    const wvReload = document.getElementById('wv-reload')
+    const harvestBtn = document.getElementById('start-harvest-btn')
+
+    if (wvBack) {
+      wvBack.addEventListener('click', () => {
+        const wv = document.getElementById('scrape-webview')
+        if (wv) {
+          try { wv.goBack() } catch { /* ignore */ }
+        }
+      })
+    }
+
+    if (wvForward) {
+      wvForward.addEventListener('click', () => {
+        const wv = document.getElementById('scrape-webview')
+        if (wv) {
+          try { wv.goForward() } catch { /* ignore */ }
+        }
+      })
+    }
+
+    if (wvReload) {
+      wvReload.addEventListener('click', () => {
+        const wv = document.getElementById('scrape-webview')
+        if (wv) {
+          try { wv.reload() } catch { /* ignore */ }
+        }
+      })
+    }
+
+    if (harvestBtn) {
+      harvestBtn.addEventListener('click', () => {
+        const wv = document.getElementById('scrape-webview')
+        if (wv) harvestInteractiveNodes(wv)
+      })
+    }
   }
 
   // PAUSE / RESUME toggle

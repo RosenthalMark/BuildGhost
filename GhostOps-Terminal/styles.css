@@ -843,7 +843,8 @@ body {
   min-height: 360px;
   flex: 1 1 auto;
   border: 1px solid rgb(184 255 90 / 0.35);
-  border-radius: 6px;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
   background: #050606;
 }
 
@@ -924,6 +925,67 @@ body {
   color: var(--line-hot);
   font-size: 0.55rem;
   padding: 1px 6px;
+}
+
+.webview-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgb(7 10 9 / 0.95);
+  border: 1px solid rgb(184 255 90 / 0.18);
+  border-radius: 6px 6px 0 0;
+  flex-shrink: 0;
+}
+
+.wv-nav-btn {
+  background: transparent;
+  border: 1px solid rgb(184 255 90 / 0.25);
+  color: var(--accent-primary, rgb(184, 255, 90));
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.wv-nav-btn:hover {
+  background: rgb(184 255 90 / 0.1);
+}
+
+.wv-current-url {
+  flex: 1 1 auto;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.55rem;
+  color: rgb(184 255 90 / 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+  letter-spacing: 0.04em;
+}
+
+.wv-harvest-btn {
+  background: rgb(184 255 90 / 0.08);
+  border: 1px solid var(--accent-primary, rgb(184, 255, 90));
+  color: var(--accent-primary, rgb(184, 255, 90));
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.wv-harvest-btn:hover {
+  background: rgb(184 255 90 / 0.18);
+  box-shadow: 0 0 8px rgb(184 255 90 / 0.35);
 }
 
 .scrape-url-bar {
