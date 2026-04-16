@@ -615,6 +615,46 @@ body {
   border-color: rgb(184 255 90 / 0.7);
 }
 
+.nixie-spinner {
+  flex-shrink: 0;
+  width: 1.1em;
+  text-align: center;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.58rem;
+  color: var(--line-hot);
+  text-shadow: 0 0 6px var(--line-hot);
+  position: relative;
+  z-index: 2;
+  margin-right: 3px;
+  letter-spacing: 0;
+}
+
+.nixie-scroller--scanning {
+  border-color: rgb(184 255 90 / 0.75);
+  box-shadow:
+    inset 0 0 16px rgb(184 255 90 / 0.2),
+    0 0 14px rgb(184 255 90 / 0.3);
+}
+
+.nixie-scroller--scanning .nixie-text {
+  animation-duration: 7s;
+}
+
+.nixie-scroller--done {
+  border-color: rgb(100 220 255 / 0.65);
+  box-shadow:
+    inset 0 0 12px rgb(100 220 255 / 0.14),
+    0 0 10px rgb(100 220 255 / 0.2);
+  color: rgb(100 220 255);
+  text-shadow: 0 0 6px rgb(100 220 255);
+}
+
+.nixie-scroller--done .nixie-text {
+  color: rgb(100 220 255);
+  text-shadow: 0 0 6px rgb(100 220 255);
+  animation-duration: 10s;
+}
+
 .nixie-scroller--runner {
   margin-top: 2px;
   margin-bottom: 4px;

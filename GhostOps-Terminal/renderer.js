@@ -13,6 +13,131 @@ const navItems = Array.from(document.querySelectorAll('.nav-item'))
 const introVid = document.getElementById('intro-vid')
 const staticLogo = document.getElementById('static-logo')
 
+const NixieTicker = (function () {
+  const SPIN = ['◢', '◣', '◤', '◥']
+  const IDLE_MSGS = [
+    'GHOSTOPS TERMINAL · SCRAPETAG ONLINE · AWAITING HARVEST COMMAND',
+    'PRO TIP: DATA-TEST ATTRIBUTES DECOUPLE YOUR SUITE FROM UI CHURN',
+    'TOTAL RECALL MODE: CAPTURES ALL INTERACTIVE + STRUCTURAL NODES',
+    'CONFIDENCE ENGINE: GREEN = UNIQUE ANCHOR · ORANGE = FRAGILE SELECTOR',
+    'BUILDGHOST · THE STABILITY BUTTON FOR VP-LEVEL ENGINEERING ORGS',
+    'PATTERN RECOGNIZER: IDENTICAL ELEMENTS GROUPED INTO COLLECTIONS',
+    'ZERO FLAKY TESTS · ZERO TOLERANCE POLICY · ENGAGE HARVEST NOW',
+    'SCRAPETAG STANDS GUARD · YOUR SELECTORS WILL NEVER BREAK AGAIN',
+  ]
+  let spinFrame = 0
+  let spinTimer = null
+  let cycleTimer = null
+  let cycleIdx = 0
+  let isActive = false
+
+  function el() { return document.querySelector('.nixie-text') }
+  function spinnerEl() { return document.getElementById('nixie-spinner') }
+  function scrollerEl() { return document.getElementById('nixie-scroller') }
+
+  function setMode(cls) {
+    const s = scrollerEl()
+    if (!s) return
+    s.classList.remove('nixie-scroller--scanning', 'nixie-scroller--done')
+    if (cls) s.classList.add(cls)
+  }
+
+  function setText(msg) {
+    const t = el()
+    if (!t) return
+    const display = `> ${msg}_`
+    t.textContent = display
+    t.style.animation = 'none'
+    void t.offsetHeight
+    t.style.animation = ''
+  }
+
+  function startSpin() {
+    if (spinTimer) return
+    spinFrame = 0
+    const sp = spinnerEl()
+    if (sp) sp.textContent = SPIN[0]
+    spinTimer = setInterval(() => {
+      spinFrame = (spinFrame + 1) % SPIN.length
+      const s = spinnerEl()
+      if (s) s.textContent = SPIN[spinFrame]
+    }, 110)
+  }
+
+  function stopSpin() {
+    clearInterval(spinTimer)
+    spinTimer = null
+    const sp = spinnerEl()
+    if (sp) sp.textContent = ''
+  }
+
+  function stopCycle() {
+    clearInterval(cycleTimer)
+    cycleTimer = null
+  }
+
+  function startCycle(msgs, interval) {
+    stopCycle()
+    cycleIdx = 0
+    setText(msgs[0])
+    cycleTimer = setInterval(() => {
+      cycleIdx = (cycleIdx + 1) % msgs.length
+      setText(msgs[cycleIdx])
+    }, interval)
+  }
+
+  function idle() {
+    if (isActive) return
+    stopCycle()
+    stopSpin()
+    setMode(null)
+    startCycle(IDLE_MSGS, 5500)
+  }
+
+  function boot(url) {
+    stopCycle()
+    isActive = true
+    setMode('nixie-scroller--scanning')
+    startSpin()
+    const domain = url ? url.replace(/https?:\/\//, '').split('/')[0].toUpperCase() : 'TARGET'
+    const seq = [
+      `■ TOTAL RECALL ENGAGED ■ TARGET: ${domain}`,
+      'INITIALIZING CRAWL PROTOCOL · GHOST ENGINE ARMED',
+      'EXECUTING DEEP SCROLL · TRIGGERING LAZY ASSETS',
+    ]
+    let i = 0
+    setText(seq[0])
+    const advance = () => { i++; if (i < seq.length) { setText(seq[i]); setTimeout(advance, 480) } }
+    setTimeout(advance, 480)
+  }
+
+  function scan(pass, total) {
+    const pct = Math.round((pass / total) * 100)
+    setText(`SCANNING PAGE · PASS ${pass}/${total} · ${pct}% COMPLETE`)
+  }
+
+  function querying() {
+    setText('QUERYING DOM · ANALYZING ALL VISIBLE NODES')
+  }
+
+  function done(stats) {
+    isActive = false
+    stopSpin()
+    setMode('nixie-scroller--done')
+    const msgs = [
+      `■ HARVEST COMPLETE ■ ${stats.total} NODES · ${stats.masters} UNIQUE · ${stats.ghosts} GROUPED`,
+      `CONFIDENCE: ${stats.green} HIGH-CONFIDENCE · ${stats.orange} FRAGILE SELECTORS`,
+      stats.collections > 0 ? `${stats.collections} REPEATING PATTERN COLLECTIONS DETECTED` : 'ALL ELEMENTS ARE STRUCTURALLY UNIQUE',
+      'READY FOR REVIEW · DATA-TEST INJECTION STANDING BY',
+      'CLICK × TO EXCLUDE · CLICK LABEL TO RENAME · THEN INJECT',
+      `SCRAPETAG TOTAL RECALL COMPLETE · ${stats.total} NODES MAPPED`,
+    ]
+    startCycle(msgs, 4200)
+  }
+
+  return { idle, boot, scan, querying, done }
+})()
+
 if (introVid && staticLogo) {
   const showStaticLogo = () => {
     introVid.style.display = 'none'
@@ -986,6 +1111,7 @@ function bindScrapeWebview(webview) {
         urlDisplay.textContent = ''
       }
     }
+    NixieTicker.idle()
   })
 }
 
@@ -995,10 +1121,10 @@ const ALL_NODE_SELECTORS = [
   '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]',
   '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="combobox"]', '[role="option"]',
   '[onclick]', '[tabindex]:not([tabindex="-1"])',
-  'img', 'video', 'canvas', 'svg', 'iframe', 'picture',
-  'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'p', 'figure', 'blockquote', 'form', 'label',
+  'img', 'video', 'canvas', 'svg', 'iframe',
+  'h1', 'h2', 'h3', 'h4',
+  'section[id]', 'article[id]', 'aside[id]', 'header[id]', 'footer[id]', 'main[id]', 'nav[id]',
+  'div[id]', 'ul[id]', 'ol[id]', 'span[id]',
   '[data-testid]', '[data-test]', '[data-cy]', '[data-qa]',
 ].join(',')
 
@@ -1184,9 +1310,10 @@ function applyPatternGroups(nodes) {
 
   nodes.forEach((node) => {
     const group = groups.get(node.patternSig || node.selector)
-    const isMaster = group[0].index === node.index
-    node.isMaster = isMaster || group.length === 1
-    node.isGhost = !node.isMaster
+    const alwaysMaster = group.length <= 3
+    const isMaster = alwaysMaster || group[0].index === node.index
+    node.isMaster = isMaster
+    node.isGhost = !isMaster
     node.collectionCount = group.length
   })
 
@@ -1209,11 +1336,13 @@ async function deepScrollPage(webview) {
     await webview.executeJavaScript(`window.scrollTo({ top: ${targetY}, behavior: 'instant' })`, true)
     await new Promise((r) => setTimeout(r, 320))
     appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] pass ${i + 1}/${steps} — ${Math.round(((i + 1) / steps) * 100)}%`)
+    NixieTicker.scan(i + 1, steps)
   }
 
   await webview.executeJavaScript(`window.scrollTo({ top: 0, behavior: 'instant' })`, true)
   await new Promise((r) => setTimeout(r, 400))
   appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] scroll complete — page reset, querying DOM...`)
+  NixieTicker.querying()
 
   return { pageHeight, steps }
 }
@@ -1227,6 +1356,7 @@ async function harvestInteractiveNodes(webview) {
 
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL INITIATED ──`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] target: ${url}`)
+  NixieTicker.boot(url)
 
   try {
     await deepScrollPage(webview)
@@ -1268,6 +1398,8 @@ async function harvestInteractiveNodes(webview) {
   const green = masters.filter((n) => n.confidence >= 60).length
   const orange = masters.filter((n) => n.confidence < 60).length
   const collections = masters.filter((n) => n.collectionCount > 1).length
+
+  NixieTicker.done({ total: nodes.length, masters: masters.length, ghosts: ghosts.length, green, orange, collections })
 
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL COMPLETE ──`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ${nodes.length} nodes total | ${masters.length} unique | ${ghosts.length} grouped`)
