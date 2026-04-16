@@ -1,8 +1,8 @@
 const { chromium } = require('playwright')
 
 async function run() {
-  console.log('[SCRAPEtag] initializing headful browser')
-  console.log('[SCRAPEtag] headful mode opens a separate Chromium window by design')
+  console.log('[scrapetag] initializing headful browser')
+  console.log('[scrapetag] headful mode opens a separate Chromium window by design')
   const browser = await chromium.launch({ headless: false })
   const page = await browser.newPage()
 
@@ -11,7 +11,7 @@ async function run() {
   })
 
   await page.goto('https://testghost.com', { waitUntil: 'domcontentloaded' })
-  console.log('[SCRAPEtag] page loaded: https://testghost.com')
+  console.log('[scrapetag] page loaded: https://testghost.com')
   await page.addStyleTag({
     content: `
       .ghost-tag {
@@ -86,7 +86,7 @@ async function run() {
 
         const name = window.prompt('Tag Name')
         if (!name) {
-          console.log('[SCRAPEtag] prompt canceled')
+          console.log('[scrapetag] prompt canceled')
           return
         }
 
@@ -110,14 +110,14 @@ async function run() {
         document.body.appendChild(tag)
 
         const selector = computeSelector(target)
-        console.log(`[SCRAPEtag] selector=${selector} | tag=${name}`)
+        console.log(`[scrapetag] selector=${selector} | tag=${name}`)
       },
       true
     )
   })
 
-  console.log('[SCRAPEtag] tag injector armed on https://testghost.com')
-  console.log('[SCRAPEtag] click any element in the browser window to create a tag')
+  console.log('[scrapetag] tag injector armed on https://testghost.com')
+  console.log('[scrapetag] click any element in the browser window to create a tag')
   process.stdin.resume()
 
   const shutdown = async () => {
@@ -130,6 +130,6 @@ async function run() {
 }
 
 run().catch((error) => {
-  console.error(`[SCRAPEtag] fatal: ${error.message}`)
+  console.error(`[scrapetag] fatal: ${error.message}`)
   process.exit(1)
 })

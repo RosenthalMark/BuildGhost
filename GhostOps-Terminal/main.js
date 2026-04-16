@@ -6,7 +6,7 @@ const { spawn } = require('child_process')
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
 const SPOOLER_APP_ROOT = path.join(TOOL_ROOT, 'Spooler')
 const SPOOLER_VENV_PYTHON = path.join(SPOOLER_APP_ROOT, 'venv', 'bin', 'python')
-const ALLOWED_TOOLS = new Set(['SCRAPEtag', 'GHOSTstub', 'BlackBox', 'Spooler'])
+const ALLOWED_TOOLS = new Set(['scrapetag', 'GHOSTstub', 'BlackBox', 'Spooler'])
 const TOOL_README_URLS = Object.freeze({
   BlackBox: 'https://github.com/RosenthalMark/BuildGhost/blob/main/Toolbelt/BlackBox/README.md'
 })
@@ -356,7 +356,7 @@ ipcMain.on('launch-tool', (event, rawToolName) => {
 ipcMain.on('scrape:capture-selector', (event, data) => {
   const alias = typeof data?.alias === 'string' ? data.alias.trim() : ''
   const selector = typeof data?.selector === 'string' ? data.selector.trim() : ''
-  const toolName = typeof data?.toolName === 'string' && data.toolName.trim() ? data.toolName.trim() : 'SCRAPEtag'
+  const toolName = typeof data?.toolName === 'string' && data.toolName.trim() ? data.toolName.trim() : 'scrapetag'
   const timestamp = typeof data?.timestamp === 'string' && data.timestamp.trim() ? data.timestamp.trim() : new Date().toISOString()
 
   if (!alias || !selector) {

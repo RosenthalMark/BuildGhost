@@ -2,7 +2,7 @@
 
 // GHOSTstub boot file is a stand-in until a module-specific clip ships (keep paths distinct in UI).
 const moduleBootConfig = {
-  SCRAPEtag: {
+  scrapetag: {
     video: 'assets/modules/scrapetag/scrapetag-boot.mp4',
     color: '#b8ff5a'
   },

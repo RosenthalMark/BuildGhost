@@ -8,9 +8,9 @@ PROJECT STRUCTURE:
 
 --- FILE CONTENTS ---
 -e \nFILE: ./index.js
-// SCRAPEtag // Entry Point
+// scrapetag // Entry Point
 // Goal: Initialize Playwright crawler and begin DOM fingerprinting.
-console.log("SCRAPEtag Initialized...");
+console.log("scrapetag Initialized...");
 const { chromium } = require('playwright');
 
 (async () => {
