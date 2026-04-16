@@ -15,7 +15,7 @@ const staticLogo = document.getElementById('static-logo')
 
 const NixieTicker = (function () {
   const SPIN = ['◢', '◣', '◤', '◥']
-  const SEP = '     ·     '
+  const SEP = '   •   '
   const IDLE_MSGS = [
     'GHOSTOPS TERMINAL · SCRAPETAG ONLINE · AWAITING HARVEST COMMAND',
     'PRO TIP: DATA-TEST ATTRIBUTES DECOUPLE YOUR SUITE FROM UI CHURN',
@@ -29,6 +29,12 @@ const NixieTicker = (function () {
   let spinFrame = 0
   let spinTimer = null
   let isActive = false
+  let bootTimers = []
+
+  function clearBootTimers() {
+    bootTimers.forEach((id) => clearTimeout(id))
+    bootTimers = []
+  }
 
   function textEl() { return document.querySelector('.nixie-text') }
   function spinnerEl() { return document.getElementById('nixie-spinner') }
@@ -82,6 +88,7 @@ const NixieTicker = (function () {
   }
 
   function boot(url) {
+    clearBootTimers()
     isActive = true
     setMode('nixie-scroller--scanning')
     startSpin()
@@ -93,8 +100,14 @@ const NixieTicker = (function () {
     ]
     let i = 0
     setText(seq[0], 110)
-    const advance = () => { i++; if (i < seq.length) { setText(seq[i], 110); setTimeout(advance, 1400) } }
-    setTimeout(advance, 1400)
+    const advance = () => {
+      i++
+      if (i < seq.length) {
+        setText(seq[i], 110)
+        bootTimers.push(setTimeout(advance, 1400))
+      }
+    }
+    bootTimers.push(setTimeout(advance, 1400))
   }
 
   function scan(pass, total) {
@@ -103,10 +116,12 @@ const NixieTicker = (function () {
   }
 
   function querying() {
+    clearBootTimers()
     setText('HARVEST IN PROGRESS · ANALYZING ALL VISIBLE NODES · PLEASE STAND BY', 85)
   }
 
   function done(stats) {
+    clearBootTimers()
     isActive = false
     stopSpin()
     setMode('nixie-scroller--done')

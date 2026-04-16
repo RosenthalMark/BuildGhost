@@ -604,9 +604,7 @@ body {
   display: inline-block;
   min-width: max-content;
   padding-left: 100%;
-  overflow: hidden;
   white-space: nowrap;
-  animation: headerNixieMarquee 13s linear infinite;
 }
 
 .nixie-scroller:hover {
@@ -637,7 +635,7 @@ body {
 }
 
 .nixie-scroller--scanning .nixie-text {
-  animation-duration: 7s;
+  color: var(--line-hot);
 }
 
 .nixie-scroller--done {
@@ -652,7 +650,6 @@ body {
 .nixie-scroller--done .nixie-text {
   color: rgb(100 220 255);
   text-shadow: 0 0 6px rgb(100 220 255);
-  animation-duration: 10s;
 }
 
 .nixie-scroller--runner {
