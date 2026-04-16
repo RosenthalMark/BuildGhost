@@ -15,6 +15,7 @@ const staticLogo = document.getElementById('static-logo')
 
 const NixieTicker = (function () {
   const SPIN = ['◢', '◣', '◤', '◥']
+  const SEP = '     ·     '
   const IDLE_MSGS = [
     'GHOSTOPS TERMINAL · SCRAPETAG ONLINE · AWAITING HARVEST COMMAND',
     'PRO TIP: DATA-TEST ATTRIBUTES DECOUPLE YOUR SUITE FROM UI CHURN',
@@ -27,11 +28,9 @@ const NixieTicker = (function () {
   ]
   let spinFrame = 0
   let spinTimer = null
-  let cycleTimer = null
-  let cycleIdx = 0
   let isActive = false
 
-  function el() { return document.querySelector('.nixie-text') }
+  function textEl() { return document.querySelector('.nixie-text') }
   function spinnerEl() { return document.getElementById('nixie-spinner') }
   function scrollerEl() { return document.getElementById('nixie-scroller') }
 
@@ -42,14 +41,18 @@ const NixieTicker = (function () {
     if (cls) s.classList.add(cls)
   }
 
-  function setText(msg) {
-    const t = el()
+  function setText(msg, speedPxPerSec) {
+    const t = textEl()
     if (!t) return
+    const px = speedPxPerSec || 80
     const display = `> ${msg}_`
     t.textContent = display
+    const containerW = t.parentElement ? t.parentElement.offsetWidth : 420
+    const textW = display.length * 6.8
+    const duration = Math.max(5, (containerW + textW) / px)
     t.style.animation = 'none'
     void t.offsetHeight
-    t.style.animation = ''
+    t.style.animation = `headerNixieMarquee ${duration.toFixed(1)}s linear infinite`
   }
 
   function startSpin() {
@@ -71,31 +74,14 @@ const NixieTicker = (function () {
     if (sp) sp.textContent = ''
   }
 
-  function stopCycle() {
-    clearInterval(cycleTimer)
-    cycleTimer = null
-  }
-
-  function startCycle(msgs, interval) {
-    stopCycle()
-    cycleIdx = 0
-    setText(msgs[0])
-    cycleTimer = setInterval(() => {
-      cycleIdx = (cycleIdx + 1) % msgs.length
-      setText(msgs[cycleIdx])
-    }, interval)
-  }
-
   function idle() {
     if (isActive) return
-    stopCycle()
     stopSpin()
     setMode(null)
-    startCycle(IDLE_MSGS, 5500)
+    setText(IDLE_MSGS.join(SEP), 72)
   }
 
   function boot(url) {
-    stopCycle()
     isActive = true
     setMode('nixie-scroller--scanning')
     startSpin()
@@ -106,18 +92,18 @@ const NixieTicker = (function () {
       'EXECUTING DEEP SCROLL · TRIGGERING LAZY ASSETS',
     ]
     let i = 0
-    setText(seq[0])
-    const advance = () => { i++; if (i < seq.length) { setText(seq[i]); setTimeout(advance, 480) } }
-    setTimeout(advance, 480)
+    setText(seq[0], 110)
+    const advance = () => { i++; if (i < seq.length) { setText(seq[i], 110); setTimeout(advance, 1400) } }
+    setTimeout(advance, 1400)
   }
 
   function scan(pass, total) {
     const pct = Math.round((pass / total) * 100)
-    setText(`SCANNING PAGE · PASS ${pass}/${total} · ${pct}% COMPLETE`)
+    setText(`SCANNING PAGE · PASS ${pass}/${total} · ${pct}% COMPLETE`, 110)
   }
 
   function querying() {
-    setText('QUERYING DOM · ANALYZING ALL VISIBLE NODES')
+    setText('HARVEST IN PROGRESS · ANALYZING ALL VISIBLE NODES · PLEASE STAND BY', 85)
   }
 
   function done(stats) {
@@ -127,12 +113,12 @@ const NixieTicker = (function () {
     const msgs = [
       `■ HARVEST COMPLETE ■ ${stats.total} NODES · ${stats.masters} UNIQUE · ${stats.ghosts} GROUPED`,
       `CONFIDENCE: ${stats.green} HIGH-CONFIDENCE · ${stats.orange} FRAGILE SELECTORS`,
-      stats.collections > 0 ? `${stats.collections} REPEATING PATTERN COLLECTIONS DETECTED` : 'ALL ELEMENTS ARE STRUCTURALLY UNIQUE',
+      stats.collections > 0 ? `${stats.collections} REPEATING PATTERN COLLECTIONS DETECTED` : 'ALL ELEMENTS STRUCTURALLY UNIQUE',
       'READY FOR REVIEW · DATA-TEST INJECTION STANDING BY',
       'CLICK × TO EXCLUDE · CLICK LABEL TO RENAME · THEN INJECT',
       `SCRAPETAG TOTAL RECALL COMPLETE · ${stats.total} NODES MAPPED`,
     ]
-    startCycle(msgs, 4200)
+    setText(msgs.join(SEP), 68)
   }
 
   return { idle, boot, scan, querying, done }
@@ -486,7 +472,7 @@ function setStageIdentity() {
     if (activeRoute === 'tool' && activeTool === 'Spooler') {
       nixieShell.style.setProperty('--nixie-header-skin', 'url("../Toolbelt/Spooler/assets/Spooler_led_scroller.png")')
     } else {
-      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/modules/scrapetag/scrapetag-selector-display.png")')
+      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/core/Nixie_led_scroller.png")')
     }
   }
 
@@ -1269,35 +1255,93 @@ function scoreNodeConfidence(selector) {
   return Math.max(0, Math.min(100, score))
 }
 
-function deriveLogicalName(node) {
-  const typeSuffix = node.type.startsWith('input') ? 'input'
-    : node.type === 'link' ? 'link'
-    : node.type === 'button' ? 'btn'
-    : node.type === 'select' ? 'select'
-    : node.type === 'textarea' ? 'textarea'
-    : node.type === 'image' ? 'img'
-    : node.type.startsWith('heading') ? node.type.replace('heading[', '').replace(']', '')
-    : node.type.startsWith('landmark') ? node.type.replace('landmark[', '').replace(']', '')
-    : 'el'
+function extractNamespace(selector) {
+  if (!selector) return null
+  const parts = selector.split(' > ')
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const m = parts[i].match(/#([a-zA-Z][\w-]*)/)
+    if (m) {
+      return m[1]
+        .replace(/([a-z])([A-Z])/g, '$1-$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+        .toLowerCase()
+    }
+  }
+  const LANDMARK_TAGS = ['nav', 'header', 'footer', 'main', 'section', 'article', 'aside']
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const tag = parts[i].split(/[.:#[\s]/)[0].toLowerCase()
+    if (LANDMARK_TAGS.includes(tag)) return tag
+  }
+  return null
+}
 
-  const idMatch = node.selector.match(/^#([a-zA-Z][\w-]*)/)
-  if (idMatch) {
-    return idMatch[1]
-      .replace(/([a-z])([A-Z])/g, '$1-$2')
-      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
-      .toLowerCase()
+function semanticSuffix(node) {
+  const type = node.type
+  const label = (node.label || '').toLowerCase()
+  if (type === 'link') return 'link'
+  if (type === 'button' || type.startsWith('role[button')) {
+    if (/play|launch|start|run/i.test(label)) return 'play-btn'
+    if (/close|dismiss|cancel/i.test(label)) return 'close-btn'
+    if (/submit|confirm|save/i.test(label)) return 'submit-btn'
+    if (/next|›|more/i.test(label)) return 'next-btn'
+    if (/prev|back|‹/i.test(label)) return 'prev-btn'
+    if (/see all|view all/i.test(label)) return 'view-all-btn'
+    return 'btn'
+  }
+  if (type.startsWith('input')) return type.replace('input[', 'input-').replace(']', '')
+  if (type === 'select') return 'select'
+  if (type === 'textarea') return 'textarea'
+  if (type === 'image') return 'img'
+  if (type === 'video') return 'video'
+  if (type === 'canvas') return 'canvas'
+  if (type === 'svg') return 'icon'
+  if (type === 'iframe') return 'frame'
+  if (type === 'heading[h1]') return 'header'
+  if (type === 'heading[h2]') return 'sub-header'
+  if (type === 'heading[h3]') return 'section-title'
+  if (type === 'heading[h4]') return 'caption'
+  if (type === 'landmark[nav]') return 'nav-container'
+  if (type === 'landmark[header]') return 'header-bar'
+  if (type === 'landmark[footer]') return 'footer-bar'
+  if (type === 'landmark[main]') return 'main-container'
+  if (type === 'landmark[section]') return 'section-container'
+  if (type === 'landmark[article]') return 'article-container'
+  if (type === 'landmark[aside]') return 'sidebar-container'
+  return 'container'
+}
+
+function deriveLogicalName(node) {
+  const sel = node.selector || ''
+
+  if (sel.startsWith('#')) {
+    const idMatch = sel.match(/^#([a-zA-Z][\w-]*)/)
+    if (idMatch) {
+      const base = idMatch[1]
+        .replace(/([a-z])([A-Z])/g, '$1-$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+        .toLowerCase()
+      const suffix = semanticSuffix(node)
+      if (suffix.endsWith('-container') || suffix === 'nav-container' || suffix === 'header-bar' || suffix === 'footer-bar' || suffix === 'main-container') {
+        return `${base}-container`
+      }
+      return base
+    }
   }
 
-  const raw = node.label || node.type
-  const slug = raw
+  const namespace = extractNamespace(sel)
+  const suffix = semanticSuffix(node)
+
+  if (namespace) return `${namespace}-${suffix}`
+
+  const raw = (node.label || node.type)
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .trim()
     .split(/\s+/)
-    .slice(0, 4)
+    .slice(0, 3)
     .join('-')
 
-  return slug ? `${slug}-${typeSuffix}` : `node-${node.index}-${typeSuffix}`
+  return raw ? `${raw}-${suffix}` : `node-${node.index}-${suffix}`
 }
 
 function applyPatternGroups(nodes) {
