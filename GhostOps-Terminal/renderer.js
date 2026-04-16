@@ -965,6 +965,7 @@ function bindScrapeWebview(webview) {
   })
 
   webview.addEventListener('console-message', (event) => {
+    if (handleOverlayMessage(event.message)) return
     const capture = parseScrapeCaptureMessage(event.message)
     if (capture) {
       handleScrapeCapture(capture)
@@ -1089,6 +1090,48 @@ const HARVEST_NODE_SCRIPT = `
 })()
 `
 
+let lastHarvestNodes = []
+
+function scoreNodeConfidence(selector) {
+  let score = 50
+  if (/^#[a-zA-Z]/.test(selector)) score += 50
+  if (/\[data-/.test(selector)) score += 30
+  if (/aria-label|aria-labelledby/.test(selector)) score += 15
+  if (/nth-of-type/.test(selector)) score -= 35
+  const depth = (selector.match(/>/g) || []).length
+  if (depth >= 4 && !/^#/.test(selector)) score -= 20
+  if (/\b(btn|el|item|wrap|container|inner|outer|root|box)\b/.test(selector)) score -= 10
+  return Math.max(0, Math.min(100, score))
+}
+
+function deriveLogicalName(node) {
+  const typeSuffix = node.type.startsWith('input') ? 'input'
+    : node.type === 'link' ? 'link'
+    : node.type === 'button' ? 'btn'
+    : node.type === 'select' ? 'select'
+    : node.type === 'textarea' ? 'textarea'
+    : 'el'
+
+  const idMatch = node.selector.match(/^#([a-zA-Z][\w-]*)/)
+  if (idMatch) {
+    return idMatch[1]
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+      .toLowerCase()
+  }
+
+  const raw = node.label || node.type
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 4)
+    .join('-')
+
+  return slug ? `${slug}-${typeSuffix}` : `node-${node.index}-${typeSuffix}`
+}
+
 async function harvestInteractiveNodes(webview) {
   const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
   if (!url || url === 'about:blank') {
@@ -1099,32 +1142,172 @@ async function harvestInteractiveNodes(webview) {
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] crawling: ${url}`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying interactive nodes...`)
 
-  let nodes = []
+  let rawNodes = []
   try {
-    nodes = await webview.executeJavaScript(HARVEST_NODE_SCRIPT, true)
+    rawNodes = await webview.executeJavaScript(HARVEST_NODE_SCRIPT, true)
   } catch (err) {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] script error: ${err.message}`)
     return
   }
 
-  if (!Array.isArray(nodes) || nodes.length === 0) {
+  if (!Array.isArray(rawNodes) || rawNodes.length === 0) {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no interactive nodes found`)
     return
   }
 
-  if (nodes[0]?.error) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] DOM error: ${nodes[0].error}`)
+  if (rawNodes[0]?.error) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] DOM error: ${rawNodes[0].error}`)
     return
   }
 
+  const nodes = rawNodes.map((node) => ({
+    ...node,
+    confidence: scoreNodeConfidence(node.selector),
+    logicalName: deriveLogicalName(node),
+  }))
+
+  lastHarvestNodes = nodes
+
+  const green = nodes.filter((n) => n.confidence >= 60).length
+  const orange = nodes.filter((n) => n.confidence < 60).length
+
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange`)
   nodes.forEach((node) => {
     const rect = node.rect
     const coords = `(${rect.x},${rect.y}) ${rect.width}×${rect.height}`
-    const label = node.label ? ` "${node.label}"` : ''
-    appendTerminalLine(`[${isoStamp()}] [${String(node.index).padStart(3, '0')}] ${node.type}${label} | ${coords} | ${node.selector}`)
+    const tier = node.confidence >= 60 ? '🟢' : '🟠'
+    appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type} "${node.logicalName}" | ${coords} | ${node.selector}`)
   })
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── END REPORT ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── drawing overlays... ──`)
+
+  await drawHarvestOverlays(webview, nodes)
+}
+
+const OVERLAY_INJECT_SCRIPT = (nodes) => `
+(function (nodes) {
+  var ROOT_ID = '__ghost-overlay-root__';
+  var existing = document.getElementById(ROOT_ID);
+  if (existing) existing.remove();
+
+  var root = document.createElement('div');
+  root.id = ROOT_ID;
+  root.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483640;';
+  document.body.appendChild(root);
+
+  var styleId = '__ghost-overlay-style__';
+  if (!document.getElementById(styleId)) {
+    var s = document.createElement('style');
+    s.id = styleId;
+    s.textContent = [
+      '.__ghost-box{position:absolute;box-sizing:border-box;pointer-events:all;}',
+      '.__ghost-label{position:absolute;bottom:100%;left:0;margin-bottom:2px;',
+        'background:#050606;border:1px solid currentColor;color:inherit;',
+        'font:bold 10px/1.3 monospace;padding:2px 6px;white-space:nowrap;',
+        'cursor:text;outline:none;min-width:40px;max-width:220px;',
+        'border-radius:3px 3px 0 0;overflow:hidden;text-overflow:ellipsis;}',
+      '.__ghost-x{position:absolute;top:2px;right:2px;width:16px;height:16px;',
+        'background:#d90429;border:0;border-radius:3px;color:#fff;',
+        'font:bold 10px/16px monospace;cursor:pointer;padding:0;',
+        'display:flex;align-items:center;justify-content:center;z-index:1;}',
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  nodes.forEach(function (node) {
+    var el;
+    try { el = document.querySelector(node.selector); } catch (e) { el = null; }
+    if (!el) return;
+
+    var r = el.getBoundingClientRect();
+    var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+    var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
+    var top = r.top + scrollTop;
+    var left = r.left + scrollLeft;
+    if (r.width === 0 || r.height === 0) return;
+
+    var color = node.confidence >= 60 ? '#b8ff5a' : '#ff9500';
+    var glow = node.confidence >= 60 ? 'rgba(184,255,90,0.55)' : 'rgba(255,149,0,0.55)';
+
+    var box = document.createElement('div');
+    box.className = '__ghost-box';
+    box.dataset.ghostIndex = node.index;
+    box.style.cssText = [
+      'top:' + top + 'px;',
+      'left:' + left + 'px;',
+      'width:' + r.width + 'px;',
+      'height:' + r.height + 'px;',
+      'border:2px solid ' + color + ';',
+      'box-shadow:0 0 8px ' + glow + ',inset 0 0 4px ' + glow + ';',
+      'color:' + color + ';',
+    ].join('');
+
+    var label = document.createElement('div');
+    label.className = '__ghost-label';
+    label.contentEditable = 'true';
+    label.textContent = node.logicalName;
+    label.addEventListener('blur', function () {
+      var updated = label.textContent.trim().replace(/\\s+/g, '-').toLowerCase();
+      if (updated) label.textContent = updated;
+      console.log('[scrapetag:overlay:label]' + JSON.stringify({ index: node.index, logicalName: label.textContent }));
+    });
+    label.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); label.blur(); }
+    });
+
+    var xBtn = document.createElement('button');
+    xBtn.className = '__ghost-x';
+    xBtn.textContent = 'X';
+    xBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      box.remove();
+      console.log('[scrapetag:overlay:exclude]' + JSON.stringify({ index: node.index }));
+    });
+
+    box.appendChild(label);
+    box.appendChild(xBtn);
+    root.appendChild(box);
+  });
+
+  return { drawn: root.children.length };
+})(${JSON.stringify(nodes)})
+`
+
+async function drawHarvestOverlays(webview, nodes) {
+  try {
+    const result = await webview.executeJavaScript(OVERLAY_INJECT_SCRIPT(nodes), true)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlays drawn: ${result?.drawn ?? 0} boxes`)
+  } catch (err) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlay error: ${err.message}`)
+  }
+}
+
+function parseOverlayMessage(message) {
+  if (typeof message !== 'string') return null
+  if (message.startsWith('[scrapetag:overlay:label]')) {
+    try { return { type: 'label', ...JSON.parse(message.slice('[scrapetag:overlay:label]'.length)) } } catch { return null }
+  }
+  if (message.startsWith('[scrapetag:overlay:exclude]')) {
+    try { return { type: 'exclude', ...JSON.parse(message.slice('[scrapetag:overlay:exclude]'.length)) } } catch { return null }
+  }
+  return null
+}
+
+function handleOverlayMessage(msg) {
+  const parsed = parseOverlayMessage(msg)
+  if (!parsed) return false
+
+  const node = lastHarvestNodes.find((n) => n.index === parsed.index)
+  if (!node) return true
+
+  if (parsed.type === 'label') {
+    node.logicalName = parsed.logicalName
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:overlay] renamed [${parsed.index}] → "${parsed.logicalName}"`)
+  } else if (parsed.type === 'exclude') {
+    lastHarvestNodes = lastHarvestNodes.filter((n) => n.index !== parsed.index)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:overlay] excluded [${parsed.index}] — ${lastHarvestNodes.length} nodes remain`)
+  }
+  return true
 }
 
 function launchScrapeSession() {
