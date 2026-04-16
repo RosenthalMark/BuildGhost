@@ -989,89 +989,39 @@ function bindScrapeWebview(webview) {
   })
 }
 
-const INTERACTIVE_NODE_SELECTORS = [
-  'button:not([disabled])',
-  'a[href]',
-  'input:not([type="hidden"]):not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[role="button"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="tab"]',
-  '[role="checkbox"]',
-  '[role="radio"]',
-  '[role="option"]',
-  '[role="combobox"]',
-  '[role="switch"]',
-  '[onclick]',
-  '[tabindex]:not([tabindex="-1"])',
+const ALL_NODE_SELECTORS = [
+  'a[href]', 'button:not([disabled])',
+  'input:not([type="hidden"]):not([disabled])', 'select:not([disabled])', 'textarea:not([disabled])',
+  '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]',
+  '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="combobox"]', '[role="option"]',
+  '[onclick]', '[tabindex]:not([tabindex="-1"])',
+  'img', 'video', 'canvas', 'svg', 'iframe', 'picture',
+  'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'p', 'figure', 'blockquote', 'form', 'label',
+  '[data-testid]', '[data-test]', '[data-cy]', '[data-qa]',
 ].join(',')
-
-const DEEP_SCROLL_SCRIPT = `
-(function () {
-  return new Promise(function (resolve) {
-    var LASER_ID = '__gt-laser__';
-    var existing = document.getElementById(LASER_ID);
-    if (existing) existing.remove();
-
-    var laser = document.createElement('div');
-    laser.id = LASER_ID;
-    laser.style.cssText = [
-      'position:fixed;left:0;width:100%;height:3px;z-index:2147483647;',
-      'background:linear-gradient(90deg,transparent 0%,#b8ff5a 20%,#fff 50%,#b8ff5a 80%,transparent 100%);',
-      'box-shadow:0 0 12px #b8ff5a,0 0 32px rgba(184,255,90,0.6);',
-      'pointer-events:none;top:0;',
-      'transition:top 0.35s cubic-bezier(0.4,0,0.2,1);',
-    ].join('');
-    document.body.appendChild(laser);
-
-    var pageH = Math.max(
-      document.body.scrollHeight, document.documentElement.scrollHeight, 1
-    );
-    var viewH = window.innerHeight || 800;
-    var steps = Math.max(1, Math.ceil(pageH / viewH));
-    var step = 0;
-
-    function next() {
-      if (step >= steps) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        laser.style.top = '0px';
-        setTimeout(function () {
-          laser.remove();
-          resolve({ pageHeight: pageH, steps: steps });
-        }, 350);
-        return;
-      }
-      var targetY = step * viewH;
-      window.scrollTo({ top: targetY, behavior: 'smooth' });
-      laser.style.top = Math.min(targetY + viewH * 0.5, pageH - 4) + 'px';
-      step++;
-      setTimeout(next, 420);
-    }
-
-    next();
-  });
-})()
-`
 
 const HARVEST_NODE_SCRIPT = `
 (function () {
-  var SELECTORS = ${JSON.stringify(INTERACTIVE_NODE_SELECTORS)};
+  var SELECTORS = ${JSON.stringify(ALL_NODE_SELECTORS)};
+
+  var SKIP_TAGS = new Set(['script','style','meta','head','html','body','link','noscript','template','br','hr','wbr','path','g','defs','clippath','lineargradient','symbol']);
 
   function buildSelector(el) {
-    if (el.id) return '#' + el.id;
+    if (el.id) return '#' + CSS.escape(el.id);
     var parts = [];
     var current = el;
-    while (current && current !== document.documentElement && parts.length < 5) {
+    while (current && current !== document.documentElement && parts.length < 6) {
       var tag = current.tagName.toLowerCase();
+      if (SKIP_TAGS.has(tag)) break;
       var part = tag;
       if (current.id) {
-        part = '#' + current.id;
+        part = '#' + CSS.escape(current.id);
         parts.unshift(part);
         break;
       }
-      var cls = Array.from(current.classList).filter(function(c) { return /^[a-zA-Z_-]/.test(c); }).slice(0, 2);
+      var cls = Array.from(current.classList).filter(function(c) { return /^[a-zA-Z_-]/.test(c) && c.length > 1; }).slice(0, 2);
       if (cls.length) part += '.' + cls.join('.');
       if (current.parentElement) {
         var siblings = Array.from(current.parentElement.children).filter(function(s) { return s.tagName === current.tagName; });
@@ -1091,28 +1041,52 @@ const HARVEST_NODE_SCRIPT = `
     var sibCount = el.parentElement
       ? Array.from(el.parentElement.children).filter(function(s) { return s.tagName === el.tagName; }).length
       : 1;
-    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount;
+    var identity = (el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('action') || '').trim().slice(0, 80);
+    var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.textContent || '').trim().slice(0, 60);
+    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount + '|' + identity + '|' + text;
   }
 
   function getLabel(el) {
-    var label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent || '').trim();
+    var tag = el.tagName.toLowerCase();
+    if (tag === 'img') {
+      var alt = el.getAttribute('alt') || '';
+      var src = (el.getAttribute('src') || '').split('/').pop().split('?')[0].slice(0, 40);
+      return alt || src || 'image';
+    }
+    var label = (
+      el.getAttribute('aria-label') || el.getAttribute('title') ||
+      el.getAttribute('alt') || el.getAttribute('placeholder') ||
+      el.textContent || ''
+    ).trim();
     return label.length > 80 ? label.slice(0, 80) + '...' : label;
   }
 
-  function isVisible(el) {
+  function isRendered(el) {
+    if (el.offsetWidth > 0 || el.offsetHeight > 0) return true;
     var rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
-    var style = window.getComputedStyle(el);
-    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    if (rect.width > 0 || rect.height > 0) return true;
+    return false;
   }
 
   function nodeType(el) {
     var tag = el.tagName.toLowerCase();
-    if (tag === 'input') return 'input[' + (el.type || 'text') + ']';
     if (tag === 'a') return 'link';
     if (tag === 'button' || el.getAttribute('role') === 'button') return 'button';
+    if (tag === 'input') return 'input[' + (el.type || 'text') + ']';
     if (tag === 'select') return 'select';
     if (tag === 'textarea') return 'textarea';
+    if (tag === 'img' || tag === 'picture') return 'image';
+    if (tag === 'video') return 'video';
+    if (tag === 'canvas') return 'canvas';
+    if (tag === 'svg') return 'svg';
+    if (tag === 'iframe') return 'iframe';
+    if (tag === 'form') return 'form';
+    if (tag === 'label') return 'label';
+    if (/^h[1-6]$/.test(tag)) return 'heading[' + tag + ']';
+    if (tag === 'p') return 'paragraph';
+    if (tag === 'figure') return 'figure';
+    if (tag === 'blockquote') return 'blockquote';
+    if (['header','footer','main','nav','section','article','aside'].indexOf(tag) !== -1) return 'landmark[' + tag + ']';
     var role = el.getAttribute('role');
     if (role) return 'role[' + role + ']';
     return tag;
@@ -1123,9 +1097,13 @@ const HARVEST_NODE_SCRIPT = `
   try {
     var matches = document.querySelectorAll(SELECTORS);
     matches.forEach(function(el) {
-      if (!isVisible(el)) return;
+      var tag = el.tagName.toLowerCase();
+      if (SKIP_TAGS.has(tag)) return;
+      if (!isRendered(el)) return;
+      var style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return;
       var sel = buildSelector(el);
-      if (seen.has(sel)) return;
+      if (!sel || seen.has(sel)) return;
       seen.add(sel);
       var rect = el.getBoundingClientRect();
       var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
@@ -1171,6 +1149,9 @@ function deriveLogicalName(node) {
     : node.type === 'button' ? 'btn'
     : node.type === 'select' ? 'select'
     : node.type === 'textarea' ? 'textarea'
+    : node.type === 'image' ? 'img'
+    : node.type.startsWith('heading') ? node.type.replace('heading[', '').replace(']', '')
+    : node.type.startsWith('landmark') ? node.type.replace('landmark[', '').replace(']', '')
     : 'el'
 
   const idMatch = node.selector.match(/^#([a-zA-Z][\w-]*)/)
@@ -1212,6 +1193,31 @@ function applyPatternGroups(nodes) {
   return nodes
 }
 
+async function deepScrollPage(webview) {
+  const pageInfo = await webview.executeJavaScript(`({
+    pageHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 1),
+    viewHeight: window.innerHeight || 800
+  })`, true)
+
+  const { pageHeight, viewHeight } = pageInfo
+  const steps = Math.max(1, Math.ceil(pageHeight / viewHeight))
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] page: ${pageHeight}px — ${steps} scroll pass${steps === 1 ? '' : 'es'} required`)
+
+  for (let i = 0; i < steps; i++) {
+    const targetY = i * viewHeight
+    await webview.executeJavaScript(`window.scrollTo({ top: ${targetY}, behavior: 'instant' })`, true)
+    await new Promise((r) => setTimeout(r, 320))
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] pass ${i + 1}/${steps} — ${Math.round(((i + 1) / steps) * 100)}%`)
+  }
+
+  await webview.executeJavaScript(`window.scrollTo({ top: 0, behavior: 'instant' })`, true)
+  await new Promise((r) => setTimeout(r, 400))
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] scroll complete — page reset, querying DOM...`)
+
+  return { pageHeight, steps }
+}
+
 async function harvestInteractiveNodes(webview) {
   const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
   if (!url || url === 'about:blank') {
@@ -1219,18 +1225,16 @@ async function harvestInteractiveNodes(webview) {
     return
   }
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── DEEP SCAN INITIATED ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL INITIATED ──`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] target: ${url}`)
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] injecting scan laser...`)
 
   try {
-    const scrollResult = await webview.executeJavaScript(DEEP_SCROLL_SCRIPT, true)
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] scroll complete — ${scrollResult?.steps ?? '?'} passes, ${scrollResult?.pageHeight ?? '?'}px`)
+    await deepScrollPage(webview)
   } catch (err) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] scroll warning: ${err.message}`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] scroll warning: ${err.message}`)
   }
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying interactive nodes...`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying all visible nodes...`)
 
   let rawNodes = []
   try {
@@ -1241,7 +1245,7 @@ async function harvestInteractiveNodes(webview) {
   }
 
   if (!Array.isArray(rawNodes) || rawNodes.length === 0) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no interactive nodes found`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no nodes found`)
     return
   }
 
@@ -1260,12 +1264,14 @@ async function harvestInteractiveNodes(webview) {
   lastHarvestNodes = nodes
 
   const masters = nodes.filter((n) => n.isMaster)
+  const ghosts = nodes.filter((n) => n.isGhost)
   const green = masters.filter((n) => n.confidence >= 60).length
   const orange = masters.filter((n) => n.confidence < 60).length
   const collections = masters.filter((n) => n.collectionCount > 1).length
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes / ${masters.length} masters ──`)
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange | ${collections} collections detected`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL COMPLETE ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ${nodes.length} nodes total | ${masters.length} unique | ${ghosts.length} grouped`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange | ${collections} collections`)
   masters.forEach((node) => {
     const rect = node.rect
     const coords = `(${rect.x},${rect.y}) ${rect.width}×${rect.height}`
@@ -1273,7 +1279,7 @@ async function harvestInteractiveNodes(webview) {
     const badge = node.collectionCount > 1 ? ` ×${node.collectionCount}` : ''
     appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type}${badge} "${node.logicalName}" | ${coords} | ${node.selector}`)
   })
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── rendering surgical overlays... ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── rendering overlays... ──`)
 
   await drawHarvestOverlays(webview, nodes)
 }
