@@ -1008,6 +1008,53 @@ const INTERACTIVE_NODE_SELECTORS = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+const DEEP_SCROLL_SCRIPT = `
+(function () {
+  return new Promise(function (resolve) {
+    var LASER_ID = '__gt-laser__';
+    var existing = document.getElementById(LASER_ID);
+    if (existing) existing.remove();
+
+    var laser = document.createElement('div');
+    laser.id = LASER_ID;
+    laser.style.cssText = [
+      'position:fixed;left:0;width:100%;height:3px;z-index:2147483647;',
+      'background:linear-gradient(90deg,transparent 0%,#b8ff5a 20%,#fff 50%,#b8ff5a 80%,transparent 100%);',
+      'box-shadow:0 0 12px #b8ff5a,0 0 32px rgba(184,255,90,0.6);',
+      'pointer-events:none;top:0;',
+      'transition:top 0.35s cubic-bezier(0.4,0,0.2,1);',
+    ].join('');
+    document.body.appendChild(laser);
+
+    var pageH = Math.max(
+      document.body.scrollHeight, document.documentElement.scrollHeight, 1
+    );
+    var viewH = window.innerHeight || 800;
+    var steps = Math.max(1, Math.ceil(pageH / viewH));
+    var step = 0;
+
+    function next() {
+      if (step >= steps) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        laser.style.top = '0px';
+        setTimeout(function () {
+          laser.remove();
+          resolve({ pageHeight: pageH, steps: steps });
+        }, 350);
+        return;
+      }
+      var targetY = step * viewH;
+      window.scrollTo({ top: targetY, behavior: 'smooth' });
+      laser.style.top = Math.min(targetY + viewH * 0.5, pageH - 4) + 'px';
+      step++;
+      setTimeout(next, 420);
+    }
+
+    next();
+  });
+})()
+`
+
 const HARVEST_NODE_SCRIPT = `
 (function () {
   var SELECTORS = ${JSON.stringify(INTERACTIVE_NODE_SELECTORS)};
@@ -1034,6 +1081,17 @@ const HARVEST_NODE_SCRIPT = `
       current = current.parentElement;
     }
     return parts.join(' > ');
+  }
+
+  function buildPatternSignature(el) {
+    var tag = el.tagName.toLowerCase();
+    var cls = Array.from(el.classList).filter(function(c) { return c.length > 2; }).sort().join('.');
+    var pTag = el.parentElement ? el.parentElement.tagName.toLowerCase() : '';
+    var pCls = el.parentElement ? Array.from(el.parentElement.classList).filter(function(c) { return c.length > 2; }).sort().join('.') : '';
+    var sibCount = el.parentElement
+      ? Array.from(el.parentElement.children).filter(function(s) { return s.tagName === el.tagName; }).length
+      : 1;
+    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount;
   }
 
   function getLabel(el) {
@@ -1070,14 +1128,17 @@ const HARVEST_NODE_SCRIPT = `
       if (seen.has(sel)) return;
       seen.add(sel);
       var rect = el.getBoundingClientRect();
+      var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
       nodes.push({
         index: nodes.length,
         type: nodeType(el),
         selector: sel,
         label: getLabel(el),
+        patternSig: buildPatternSignature(el),
         rect: {
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
+          x: Math.round(rect.x + scrollLeft),
+          y: Math.round(rect.y + scrollTop),
           width: Math.round(rect.width),
           height: Math.round(rect.height)
         }
@@ -1132,6 +1193,25 @@ function deriveLogicalName(node) {
   return slug ? `${slug}-${typeSuffix}` : `node-${node.index}-${typeSuffix}`
 }
 
+function applyPatternGroups(nodes) {
+  const groups = new Map()
+  nodes.forEach((node) => {
+    const sig = node.patternSig || node.selector
+    if (!groups.has(sig)) groups.set(sig, [])
+    groups.get(sig).push(node)
+  })
+
+  nodes.forEach((node) => {
+    const group = groups.get(node.patternSig || node.selector)
+    const isMaster = group[0].index === node.index
+    node.isMaster = isMaster || group.length === 1
+    node.isGhost = !node.isMaster
+    node.collectionCount = group.length
+  })
+
+  return nodes
+}
+
 async function harvestInteractiveNodes(webview) {
   const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
   if (!url || url === 'about:blank') {
@@ -1139,7 +1219,17 @@ async function harvestInteractiveNodes(webview) {
     return
   }
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] crawling: ${url}`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── DEEP SCAN INITIATED ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] target: ${url}`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] injecting scan laser...`)
+
+  try {
+    const scrollResult = await webview.executeJavaScript(DEEP_SCROLL_SCRIPT, true)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] scroll complete — ${scrollResult?.steps ?? '?'} passes, ${scrollResult?.pageHeight ?? '?'}px`)
+  } catch (err) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] scroll warning: ${err.message}`)
+  }
+
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying interactive nodes...`)
 
   let rawNodes = []
@@ -1160,33 +1250,37 @@ async function harvestInteractiveNodes(webview) {
     return
   }
 
-  const nodes = rawNodes.map((node) => ({
+  const enriched = rawNodes.map((node) => ({
     ...node,
     confidence: scoreNodeConfidence(node.selector),
     logicalName: deriveLogicalName(node),
   }))
 
+  const nodes = applyPatternGroups(enriched)
   lastHarvestNodes = nodes
 
-  const green = nodes.filter((n) => n.confidence >= 60).length
-  const orange = nodes.filter((n) => n.confidence < 60).length
+  const masters = nodes.filter((n) => n.isMaster)
+  const green = masters.filter((n) => n.confidence >= 60).length
+  const orange = masters.filter((n) => n.confidence < 60).length
+  const collections = masters.filter((n) => n.collectionCount > 1).length
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes ──`)
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange`)
-  nodes.forEach((node) => {
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes / ${masters.length} masters ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange | ${collections} collections detected`)
+  masters.forEach((node) => {
     const rect = node.rect
     const coords = `(${rect.x},${rect.y}) ${rect.width}×${rect.height}`
     const tier = node.confidence >= 60 ? '🟢' : '🟠'
-    appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type} "${node.logicalName}" | ${coords} | ${node.selector}`)
+    const badge = node.collectionCount > 1 ? ` ×${node.collectionCount}` : ''
+    appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type}${badge} "${node.logicalName}" | ${coords} | ${node.selector}`)
   })
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── drawing overlays... ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── rendering surgical overlays... ──`)
 
   await drawHarvestOverlays(webview, nodes)
 }
 
 const OVERLAY_INJECT_SCRIPT = (nodes) => `
 (function (nodes) {
-  var ROOT_ID = '__ghost-overlay-root__';
+  var ROOT_ID = '__gt-overlay-root__';
   var existing = document.getElementById(ROOT_ID);
   if (existing) existing.remove();
 
@@ -1195,88 +1289,118 @@ const OVERLAY_INJECT_SCRIPT = (nodes) => `
   root.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483640;';
   document.body.appendChild(root);
 
-  var styleId = '__ghost-overlay-style__';
+  var styleId = '__gt-overlay-style__';
   if (!document.getElementById(styleId)) {
     var s = document.createElement('style');
     s.id = styleId;
     s.textContent = [
-      '.__ghost-box{position:absolute;box-sizing:border-box;pointer-events:all;}',
-      '.__ghost-label{position:absolute;bottom:100%;left:0;margin-bottom:2px;',
-        'background:#050606;border:1px solid currentColor;color:inherit;',
-        'font:bold 10px/1.3 monospace;padding:2px 6px;white-space:nowrap;',
-        'cursor:text;outline:none;min-width:40px;max-width:220px;',
-        'border-radius:3px 3px 0 0;overflow:hidden;text-overflow:ellipsis;}',
-      '.__ghost-x{position:absolute;top:2px;right:2px;width:16px;height:16px;',
+      '@keyframes __gtBloom{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:scale(1)}}',
+      '.__gt-box{position:absolute;box-sizing:border-box;pointer-events:all;border-radius:4px;',
+        'animation:__gtBloom 0.22s cubic-bezier(0.34,1.56,0.64,1) both;}',
+      '.__gt-box--ghost{opacity:0.18!important;border-style:dashed!important;',
+        'pointer-events:none!important;box-shadow:none!important;background:none!important;animation:none!important;}',
+      '.__gt-label{position:absolute;bottom:100%;left:-1px;margin-bottom:3px;',
+        'background:rgba(5,6,6,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);',
+        'border:1px solid currentColor;border-radius:4px 4px 0 0;color:inherit;',
+        'font:700 10px/1.4 monospace;letter-spacing:.07em;padding:2px 8px;',
+        'white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;',
+        'text-shadow:0 0 8px currentColor;cursor:text;outline:none;}',
+      '.__gt-badge{position:absolute;top:3px;left:3px;background:rgba(5,6,6,0.80);',
+        'backdrop-filter:blur(4px);border:1px solid currentColor;border-radius:3px;',
+        'color:inherit;font:700 9px monospace;padding:1px 5px;letter-spacing:.05em;pointer-events:none;}',
+      '.__gt-x{position:absolute;top:3px;right:3px;width:16px;height:16px;',
         'background:#d90429;border:0;border-radius:3px;color:#fff;',
-        'font:bold 10px/16px monospace;cursor:pointer;padding:0;',
-        'display:flex;align-items:center;justify-content:center;z-index:1;}',
+        'font:700 10px/16px monospace;cursor:pointer;padding:0;z-index:1;}',
     ].join('');
     document.head.appendChild(s);
   }
 
+  var masterCount = 0;
   nodes.forEach(function (node) {
     var el;
     try { el = document.querySelector(node.selector); } catch (e) { el = null; }
     if (!el) return;
 
-    var r = el.getBoundingClientRect();
     var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
     var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
+    var r = el.getBoundingClientRect();
     var top = r.top + scrollTop;
     var left = r.left + scrollLeft;
     if (r.width === 0 || r.height === 0) return;
 
-    var color = node.confidence >= 60 ? '#b8ff5a' : '#ff9500';
-    var glow = node.confidence >= 60 ? 'rgba(184,255,90,0.55)' : 'rgba(255,149,0,0.55)';
+    var isGreen = node.confidence >= 60;
+    var color = isGreen ? '#b8ff5a' : '#ff9500';
+    var rgb = isGreen ? '184,255,90' : '255,149,0';
 
     var box = document.createElement('div');
-    box.className = '__ghost-box';
-    box.dataset.ghostIndex = node.index;
+    box.className = '__gt-box' + (node.isGhost ? ' __gt-box--ghost' : '');
+    box.setAttribute('data-test-index', node.index);
     box.style.cssText = [
       'top:' + top + 'px;',
       'left:' + left + 'px;',
       'width:' + r.width + 'px;',
       'height:' + r.height + 'px;',
-      'border:2px solid ' + color + ';',
-      'box-shadow:0 0 8px ' + glow + ',inset 0 0 4px ' + glow + ';',
+      '--gc:' + color + ';--gr:' + rgb + ';',
       'color:' + color + ';',
+      'border:2px solid ' + color + ';',
+      node.isGhost ? '' : [
+        'background:linear-gradient(135deg,rgba(' + rgb + ',0.13) 0%,rgba(' + rgb + ',0.04) 100%);',
+        'box-shadow:',
+          '0 0 0 1px rgba(' + rgb + ',0.28),',
+          '0 0 10px rgba(' + rgb + ',0.55),',
+          '0 0 28px rgba(' + rgb + ',0.28),',
+          '0 6px 20px rgba(0,0,0,0.55);',
+        'animation-delay:' + (node.isMaster ? masterCount * 65 : 0) + 'ms;',
+      ].join(''),
     ].join('');
 
-    var label = document.createElement('div');
-    label.className = '__ghost-label';
-    label.contentEditable = 'true';
-    label.textContent = node.logicalName;
-    label.addEventListener('blur', function () {
-      var updated = label.textContent.trim().replace(/\\s+/g, '-').toLowerCase();
-      if (updated) label.textContent = updated;
-      console.log('[scrapetag:overlay:label]' + JSON.stringify({ index: node.index, logicalName: label.textContent }));
-    });
-    label.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); label.blur(); }
-    });
+    if (node.isMaster) masterCount++;
 
-    var xBtn = document.createElement('button');
-    xBtn.className = '__ghost-x';
-    xBtn.textContent = 'X';
-    xBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      box.remove();
-      console.log('[scrapetag:overlay:exclude]' + JSON.stringify({ index: node.index }));
-    });
+    if (!node.isGhost) {
+      var label = document.createElement('div');
+      label.className = '__gt-label';
+      label.contentEditable = 'true';
+      label.textContent = node.logicalName;
+      label.addEventListener('blur', function () {
+        var updated = label.textContent.trim().replace(/\\s+/g, '-').toLowerCase();
+        if (updated) label.textContent = updated;
+        console.log('[scrapetag:overlay:label]' + JSON.stringify({ index: node.index, logicalName: label.textContent }));
+      });
+      label.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); label.blur(); }
+      });
 
-    box.appendChild(label);
-    box.appendChild(xBtn);
+      if (node.collectionCount > 1) {
+        var badge = document.createElement('div');
+        badge.className = '__gt-badge';
+        badge.textContent = '\\u00d7' + node.collectionCount;
+        box.appendChild(badge);
+      }
+
+      var xBtn = document.createElement('button');
+      xBtn.className = '__gt-x';
+      xBtn.textContent = 'X';
+      xBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        box.remove();
+        console.log('[scrapetag:overlay:exclude]' + JSON.stringify({ index: node.index }));
+      });
+
+      box.appendChild(label);
+      box.appendChild(xBtn);
+    }
+
     root.appendChild(box);
   });
 
-  return { drawn: root.children.length };
+  return { drawn: root.children.length, masters: masterCount };
 })(${JSON.stringify(nodes)})
 `
 
 async function drawHarvestOverlays(webview, nodes) {
   try {
     const result = await webview.executeJavaScript(OVERLAY_INJECT_SCRIPT(nodes), true)
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlays drawn: ${result?.drawn ?? 0} boxes`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ✦ ${result?.masters ?? 0} master boxes / ${result?.drawn ?? 0} total rendered`)
   } catch (err) {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlay error: ${err.message}`)
   }
