@@ -13,6 +13,132 @@ const navItems = Array.from(document.querySelectorAll('.nav-item'))
 const introVid = document.getElementById('intro-vid')
 const staticLogo = document.getElementById('static-logo')
 
+const NixieTicker = (function () {
+  const SPIN = ['◢', '◣', '◤', '◥']
+  const SEP = '   •   '
+  const IDLE_MSGS = [
+    'GHOSTOPS TERMINAL · SCRAPETAG ONLINE · AWAITING HARVEST COMMAND',
+    'PRO TIP: DATA-TEST ATTRIBUTES DECOUPLE YOUR SUITE FROM UI CHURN',
+    'TOTAL RECALL MODE: CAPTURES ALL INTERACTIVE + STRUCTURAL NODES',
+    'CONFIDENCE ENGINE: GREEN = UNIQUE ANCHOR · ORANGE = FRAGILE SELECTOR',
+    'BUILDGHOST · THE STABILITY BUTTON FOR VP-LEVEL ENGINEERING ORGS',
+    'PATTERN RECOGNIZER: IDENTICAL ELEMENTS GROUPED INTO COLLECTIONS',
+    'ZERO FLAKY TESTS · ZERO TOLERANCE POLICY · ENGAGE HARVEST NOW',
+    'SCRAPETAG STANDS GUARD · YOUR SELECTORS WILL NEVER BREAK AGAIN',
+  ]
+  let spinFrame = 0
+  let spinTimer = null
+  let isActive = false
+  let bootTimers = []
+
+  function clearBootTimers() {
+    bootTimers.forEach((id) => clearTimeout(id))
+    bootTimers = []
+  }
+
+  function textEl() { return document.querySelector('.nixie-text') }
+  function spinnerEl() { return document.getElementById('nixie-spinner') }
+  function scrollerEl() { return document.getElementById('nixie-scroller') }
+
+  function setMode(cls) {
+    const s = scrollerEl()
+    if (!s) return
+    s.classList.remove('nixie-scroller--scanning', 'nixie-scroller--done')
+    if (cls) s.classList.add(cls)
+  }
+
+  function setText(msg, speedPxPerSec) {
+    const t = textEl()
+    if (!t) return
+    const px = speedPxPerSec || 80
+    const display = `> ${msg}_`
+    t.textContent = display
+    const containerW = t.parentElement ? t.parentElement.offsetWidth : 420
+    const textW = display.length * 6.8
+    const duration = Math.max(5, (containerW + textW) / px)
+    t.style.animation = 'none'
+    void t.offsetHeight
+    t.style.animation = `headerNixieMarquee ${duration.toFixed(1)}s linear infinite`
+  }
+
+  function startSpin() {
+    if (spinTimer) return
+    spinFrame = 0
+    const sp = spinnerEl()
+    if (sp) sp.textContent = SPIN[0]
+    spinTimer = setInterval(() => {
+      spinFrame = (spinFrame + 1) % SPIN.length
+      const s = spinnerEl()
+      if (s) s.textContent = SPIN[spinFrame]
+    }, 110)
+  }
+
+  function stopSpin() {
+    clearInterval(spinTimer)
+    spinTimer = null
+    const sp = spinnerEl()
+    if (sp) sp.textContent = ''
+  }
+
+  function idle() {
+    if (isActive) return
+    stopSpin()
+    setMode(null)
+    setText(IDLE_MSGS.join(SEP), 72)
+  }
+
+  function boot(url) {
+    clearBootTimers()
+    isActive = true
+    setMode('nixie-scroller--scanning')
+    startSpin()
+    const domain = url ? url.replace(/https?:\/\//, '').split('/')[0].toUpperCase() : 'TARGET'
+    const seq = [
+      `■ TOTAL RECALL ENGAGED ■ TARGET: ${domain}`,
+      'INITIALIZING CRAWL PROTOCOL · GHOST ENGINE ARMED',
+      'EXECUTING DEEP SCROLL · TRIGGERING LAZY ASSETS',
+    ]
+    let i = 0
+    setText(seq[0], 110)
+    const advance = () => {
+      i++
+      if (i < seq.length) {
+        setText(seq[i], 110)
+        bootTimers.push(setTimeout(advance, 1400))
+      }
+    }
+    bootTimers.push(setTimeout(advance, 1400))
+  }
+
+  function scan(pass, total) {
+    const pct = Math.round((pass / total) * 100)
+    setText(`SCANNING PAGE · PASS ${pass}/${total} · ${pct}% COMPLETE`, 110)
+  }
+
+  function querying() {
+    clearBootTimers()
+    setText('HARVEST IN PROGRESS · ANALYZING ALL VISIBLE NODES · PLEASE STAND BY', 85)
+  }
+
+  function done(stats) {
+    clearBootTimers()
+    isActive = false
+    stopSpin()
+    setMode('nixie-scroller--done')
+    const msgs = [
+      `■ HARVEST COMPLETE ■ ${stats.total} NODES · ${stats.masters} UNIQUE · ${stats.ghosts} GROUPED`,
+      `CONFIDENCE: ${stats.green} HIGH-CONFIDENCE · ${stats.orange} FRAGILE SELECTORS`,
+      stats.collections > 0 ? `${stats.collections} REPEATING PATTERN COLLECTIONS DETECTED` : 'ALL ELEMENTS STRUCTURALLY UNIQUE',
+      'READY FOR REVIEW · DATA-TEST INJECTION STANDING BY',
+      'CLICK × TO EXCLUDE · CLICK LABEL TO RENAME · THEN INJECT',
+      `SCRAPETAG TOTAL RECALL COMPLETE · ${stats.total} NODES MAPPED`,
+    ]
+    setText(msgs.join(SEP), 68)
+  }
+
+  return { idle, boot, scan, querying, done }
+})()
+
 if (introVid && staticLogo) {
   const showStaticLogo = () => {
     introVid.style.display = 'none'
@@ -361,7 +487,7 @@ function setStageIdentity() {
     if (activeRoute === 'tool' && activeTool === 'Spooler') {
       nixieShell.style.setProperty('--nixie-header-skin', 'url("../Toolbelt/Spooler/assets/Spooler_led_scroller.png")')
     } else {
-      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/modules/scrapetag/scrapetag-selector-display.png")')
+      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/core/Nixie_led_scroller.png")')
     }
   }
 
@@ -986,45 +1112,43 @@ function bindScrapeWebview(webview) {
         urlDisplay.textContent = ''
       }
     }
+    NixieTicker.idle()
   })
 }
 
-const INTERACTIVE_NODE_SELECTORS = [
-  'button:not([disabled])',
-  'a[href]',
-  'input:not([type="hidden"]):not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[role="button"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="tab"]',
-  '[role="checkbox"]',
-  '[role="radio"]',
-  '[role="option"]',
-  '[role="combobox"]',
-  '[role="switch"]',
-  '[onclick]',
-  '[tabindex]:not([tabindex="-1"])',
+const ALL_NODE_SELECTORS = [
+  'a[href]', 'button:not([disabled])',
+  'input:not([type="hidden"]):not([disabled])', 'select:not([disabled])', 'textarea:not([disabled])',
+  '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]',
+  '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="combobox"]', '[role="option"]',
+  '[onclick]', '[tabindex]:not([tabindex="-1"])',
+  'img', 'video', 'canvas', 'svg', 'iframe',
+  'h1', 'h2', 'h3', 'h4',
+  'section[id]', 'article[id]', 'aside[id]', 'header[id]', 'footer[id]', 'main[id]', 'nav[id]',
+  'div[id]', 'ul[id]', 'ol[id]', 'span[id]',
+  '[data-testid]', '[data-test]', '[data-cy]', '[data-qa]',
 ].join(',')
 
 const HARVEST_NODE_SCRIPT = `
 (function () {
-  var SELECTORS = ${JSON.stringify(INTERACTIVE_NODE_SELECTORS)};
+  var SELECTORS = ${JSON.stringify(ALL_NODE_SELECTORS)};
+
+  var SKIP_TAGS = new Set(['script','style','meta','head','html','body','link','noscript','template','br','hr','wbr','path','g','defs','clippath','lineargradient','symbol']);
 
   function buildSelector(el) {
-    if (el.id) return '#' + el.id;
+    if (el.id) return '#' + CSS.escape(el.id);
     var parts = [];
     var current = el;
-    while (current && current !== document.documentElement && parts.length < 5) {
+    while (current && current !== document.documentElement && parts.length < 6) {
       var tag = current.tagName.toLowerCase();
+      if (SKIP_TAGS.has(tag)) break;
       var part = tag;
       if (current.id) {
-        part = '#' + current.id;
+        part = '#' + CSS.escape(current.id);
         parts.unshift(part);
         break;
       }
-      var cls = Array.from(current.classList).filter(function(c) { return /^[a-zA-Z_-]/.test(c); }).slice(0, 2);
+      var cls = Array.from(current.classList).filter(function(c) { return /^[a-zA-Z_-]/.test(c) && c.length > 1; }).slice(0, 2);
       if (cls.length) part += '.' + cls.join('.');
       if (current.parentElement) {
         var siblings = Array.from(current.parentElement.children).filter(function(s) { return s.tagName === current.tagName; });
@@ -1036,25 +1160,60 @@ const HARVEST_NODE_SCRIPT = `
     return parts.join(' > ');
   }
 
+  function buildPatternSignature(el) {
+    var tag = el.tagName.toLowerCase();
+    var cls = Array.from(el.classList).filter(function(c) { return c.length > 2; }).sort().join('.');
+    var pTag = el.parentElement ? el.parentElement.tagName.toLowerCase() : '';
+    var pCls = el.parentElement ? Array.from(el.parentElement.classList).filter(function(c) { return c.length > 2; }).sort().join('.') : '';
+    var sibCount = el.parentElement
+      ? Array.from(el.parentElement.children).filter(function(s) { return s.tagName === el.tagName; }).length
+      : 1;
+    var identity = (el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('action') || '').trim().slice(0, 80);
+    var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.textContent || '').trim().slice(0, 60);
+    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount + '|' + identity + '|' + text;
+  }
+
   function getLabel(el) {
-    var label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.textContent || '').trim();
+    var tag = el.tagName.toLowerCase();
+    if (tag === 'img') {
+      var alt = el.getAttribute('alt') || '';
+      var src = (el.getAttribute('src') || '').split('/').pop().split('?')[0].slice(0, 40);
+      return alt || src || 'image';
+    }
+    var label = (
+      el.getAttribute('aria-label') || el.getAttribute('title') ||
+      el.getAttribute('alt') || el.getAttribute('placeholder') ||
+      el.textContent || ''
+    ).trim();
     return label.length > 80 ? label.slice(0, 80) + '...' : label;
   }
 
-  function isVisible(el) {
+  function isRendered(el) {
+    if (el.offsetWidth > 0 || el.offsetHeight > 0) return true;
     var rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
-    var style = window.getComputedStyle(el);
-    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    if (rect.width > 0 || rect.height > 0) return true;
+    return false;
   }
 
   function nodeType(el) {
     var tag = el.tagName.toLowerCase();
-    if (tag === 'input') return 'input[' + (el.type || 'text') + ']';
     if (tag === 'a') return 'link';
     if (tag === 'button' || el.getAttribute('role') === 'button') return 'button';
+    if (tag === 'input') return 'input[' + (el.type || 'text') + ']';
     if (tag === 'select') return 'select';
     if (tag === 'textarea') return 'textarea';
+    if (tag === 'img' || tag === 'picture') return 'image';
+    if (tag === 'video') return 'video';
+    if (tag === 'canvas') return 'canvas';
+    if (tag === 'svg') return 'svg';
+    if (tag === 'iframe') return 'iframe';
+    if (tag === 'form') return 'form';
+    if (tag === 'label') return 'label';
+    if (/^h[1-6]$/.test(tag)) return 'heading[' + tag + ']';
+    if (tag === 'p') return 'paragraph';
+    if (tag === 'figure') return 'figure';
+    if (tag === 'blockquote') return 'blockquote';
+    if (['header','footer','main','nav','section','article','aside'].indexOf(tag) !== -1) return 'landmark[' + tag + ']';
     var role = el.getAttribute('role');
     if (role) return 'role[' + role + ']';
     return tag;
@@ -1065,19 +1224,26 @@ const HARVEST_NODE_SCRIPT = `
   try {
     var matches = document.querySelectorAll(SELECTORS);
     matches.forEach(function(el) {
-      if (!isVisible(el)) return;
+      var tag = el.tagName.toLowerCase();
+      if (SKIP_TAGS.has(tag)) return;
+      if (!isRendered(el)) return;
+      var style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return;
       var sel = buildSelector(el);
-      if (seen.has(sel)) return;
+      if (!sel || seen.has(sel)) return;
       seen.add(sel);
       var rect = el.getBoundingClientRect();
+      var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
       nodes.push({
         index: nodes.length,
         type: nodeType(el),
         selector: sel,
         label: getLabel(el),
+        patternSig: buildPatternSignature(el),
         rect: {
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
+          x: Math.round(rect.x + scrollLeft),
+          y: Math.round(rect.y + scrollTop),
           width: Math.round(rect.width),
           height: Math.round(rect.height)
         }
@@ -1104,32 +1270,140 @@ function scoreNodeConfidence(selector) {
   return Math.max(0, Math.min(100, score))
 }
 
-function deriveLogicalName(node) {
-  const typeSuffix = node.type.startsWith('input') ? 'input'
-    : node.type === 'link' ? 'link'
-    : node.type === 'button' ? 'btn'
-    : node.type === 'select' ? 'select'
-    : node.type === 'textarea' ? 'textarea'
-    : 'el'
+function extractNamespace(selector) {
+  if (!selector) return null
+  const parts = selector.split(' > ')
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const m = parts[i].match(/#([a-zA-Z][\w-]*)/)
+    if (m) {
+      return m[1]
+        .replace(/([a-z])([A-Z])/g, '$1-$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+        .toLowerCase()
+    }
+  }
+  const LANDMARK_TAGS = ['nav', 'header', 'footer', 'main', 'section', 'article', 'aside']
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const tag = parts[i].split(/[.:#[\s]/)[0].toLowerCase()
+    if (LANDMARK_TAGS.includes(tag)) return tag
+  }
+  return null
+}
 
-  const idMatch = node.selector.match(/^#([a-zA-Z][\w-]*)/)
-  if (idMatch) {
-    return idMatch[1]
-      .replace(/([a-z])([A-Z])/g, '$1-$2')
-      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
-      .toLowerCase()
+function semanticSuffix(node) {
+  const type = node.type
+  const label = (node.label || '').toLowerCase()
+  if (type === 'link') return 'link'
+  if (type === 'button' || type.startsWith('role[button')) {
+    if (/play|launch|start|run/i.test(label)) return 'play-btn'
+    if (/close|dismiss|cancel/i.test(label)) return 'close-btn'
+    if (/submit|confirm|save/i.test(label)) return 'submit-btn'
+    if (/next|›|more/i.test(label)) return 'next-btn'
+    if (/prev|back|‹/i.test(label)) return 'prev-btn'
+    if (/see all|view all/i.test(label)) return 'view-all-btn'
+    return 'btn'
+  }
+  if (type.startsWith('input')) return type.replace('input[', 'input-').replace(']', '')
+  if (type === 'select') return 'select'
+  if (type === 'textarea') return 'textarea'
+  if (type === 'image') return 'img'
+  if (type === 'video') return 'video'
+  if (type === 'canvas') return 'canvas'
+  if (type === 'svg') return 'icon'
+  if (type === 'iframe') return 'frame'
+  if (type === 'heading[h1]') return 'header'
+  if (type === 'heading[h2]') return 'sub-header'
+  if (type === 'heading[h3]') return 'section-title'
+  if (type === 'heading[h4]') return 'caption'
+  if (type === 'landmark[nav]') return 'nav-container'
+  if (type === 'landmark[header]') return 'header-bar'
+  if (type === 'landmark[footer]') return 'footer-bar'
+  if (type === 'landmark[main]') return 'main-container'
+  if (type === 'landmark[section]') return 'section-container'
+  if (type === 'landmark[article]') return 'article-container'
+  if (type === 'landmark[aside]') return 'sidebar-container'
+  return 'container'
+}
+
+function deriveLogicalName(node) {
+  const sel = node.selector || ''
+
+  if (sel.startsWith('#')) {
+    const idMatch = sel.match(/^#([a-zA-Z][\w-]*)/)
+    if (idMatch) {
+      const base = idMatch[1]
+        .replace(/([a-z])([A-Z])/g, '$1-$2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+        .toLowerCase()
+      const suffix = semanticSuffix(node)
+      if (suffix.endsWith('-container') || suffix === 'nav-container' || suffix === 'header-bar' || suffix === 'footer-bar' || suffix === 'main-container') {
+        return `${base}-container`
+      }
+      return base
+    }
   }
 
-  const raw = node.label || node.type
-  const slug = raw
+  const namespace = extractNamespace(sel)
+  const suffix = semanticSuffix(node)
+
+  if (namespace) return `${namespace}-${suffix}`
+
+  const raw = (node.label || node.type)
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .trim()
     .split(/\s+/)
-    .slice(0, 4)
+    .slice(0, 3)
     .join('-')
 
-  return slug ? `${slug}-${typeSuffix}` : `node-${node.index}-${typeSuffix}`
+  return raw ? `${raw}-${suffix}` : `node-${node.index}-${suffix}`
+}
+
+function applyPatternGroups(nodes) {
+  const groups = new Map()
+  nodes.forEach((node) => {
+    const sig = node.patternSig || node.selector
+    if (!groups.has(sig)) groups.set(sig, [])
+    groups.get(sig).push(node)
+  })
+
+  nodes.forEach((node) => {
+    const group = groups.get(node.patternSig || node.selector)
+    const alwaysMaster = group.length <= 3
+    const isMaster = alwaysMaster || group[0].index === node.index
+    node.isMaster = isMaster
+    node.isGhost = !isMaster
+    node.collectionCount = group.length
+  })
+
+  return nodes
+}
+
+async function deepScrollPage(webview) {
+  const pageInfo = await webview.executeJavaScript(`({
+    pageHeight: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 1),
+    viewHeight: window.innerHeight || 800
+  })`, true)
+
+  const { pageHeight, viewHeight } = pageInfo
+  const steps = Math.max(1, Math.ceil(pageHeight / viewHeight))
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] page: ${pageHeight}px — ${steps} scroll pass${steps === 1 ? '' : 'es'} required`)
+
+  for (let i = 0; i < steps; i++) {
+    const targetY = i * viewHeight
+    await webview.executeJavaScript(`window.scrollTo({ top: ${targetY}, behavior: 'instant' })`, true)
+    await new Promise((r) => setTimeout(r, 320))
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] pass ${i + 1}/${steps} — ${Math.round(((i + 1) / steps) * 100)}%`)
+    NixieTicker.scan(i + 1, steps)
+  }
+
+  await webview.executeJavaScript(`window.scrollTo({ top: 0, behavior: 'instant' })`, true)
+  await new Promise((r) => setTimeout(r, 400))
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] scroll complete — page reset, querying DOM...`)
+  NixieTicker.querying()
+
+  return { pageHeight, steps }
 }
 
 async function harvestInteractiveNodes(webview) {
@@ -1139,8 +1413,17 @@ async function harvestInteractiveNodes(webview) {
     return
   }
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] crawling: ${url}`)
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying interactive nodes...`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL INITIATED ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] target: ${url}`)
+  NixieTicker.boot(url)
+
+  try {
+    await deepScrollPage(webview)
+  } catch (err) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:scan] scroll warning: ${err.message}`)
+  }
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying all visible nodes...`)
 
   let rawNodes = []
   try {
@@ -1151,7 +1434,7 @@ async function harvestInteractiveNodes(webview) {
   }
 
   if (!Array.isArray(rawNodes) || rawNodes.length === 0) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no interactive nodes found`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no nodes found`)
     return
   }
 
@@ -1160,33 +1443,41 @@ async function harvestInteractiveNodes(webview) {
     return
   }
 
-  const nodes = rawNodes.map((node) => ({
+  const enriched = rawNodes.map((node) => ({
     ...node,
     confidence: scoreNodeConfidence(node.selector),
     logicalName: deriveLogicalName(node),
   }))
 
+  const nodes = applyPatternGroups(enriched)
   lastHarvestNodes = nodes
 
-  const green = nodes.filter((n) => n.confidence >= 60).length
-  const orange = nodes.filter((n) => n.confidence < 60).length
+  const masters = nodes.filter((n) => n.isMaster)
+  const ghosts = nodes.filter((n) => n.isGhost)
+  const green = masters.filter((n) => n.confidence >= 60).length
+  const orange = masters.filter((n) => n.confidence < 60).length
+  const collections = masters.filter((n) => n.collectionCount > 1).length
 
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── HARVEST COMPLETE: ${nodes.length} nodes ──`)
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange`)
-  nodes.forEach((node) => {
+  NixieTicker.done({ total: nodes.length, masters: masters.length, ghosts: ghosts.length, green, orange, collections })
+
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL COMPLETE ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ${nodes.length} nodes total | ${masters.length} unique | ${ghosts.length} grouped`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] confidence: ${green} green / ${orange} orange | ${collections} collections`)
+  masters.forEach((node) => {
     const rect = node.rect
     const coords = `(${rect.x},${rect.y}) ${rect.width}×${rect.height}`
     const tier = node.confidence >= 60 ? '🟢' : '🟠'
-    appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type} "${node.logicalName}" | ${coords} | ${node.selector}`)
+    const badge = node.collectionCount > 1 ? ` ×${node.collectionCount}` : ''
+    appendTerminalLine(`[${isoStamp()}] ${tier} [${String(node.index).padStart(3, '0')}] ${node.type}${badge} "${node.logicalName}" | ${coords} | ${node.selector}`)
   })
-  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── drawing overlays... ──`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── rendering overlays... ──`)
 
   await drawHarvestOverlays(webview, nodes)
 }
 
 const OVERLAY_INJECT_SCRIPT = (nodes) => `
 (function (nodes) {
-  var ROOT_ID = '__ghost-overlay-root__';
+  var ROOT_ID = '__gt-overlay-root__';
   var existing = document.getElementById(ROOT_ID);
   if (existing) existing.remove();
 
@@ -1195,88 +1486,118 @@ const OVERLAY_INJECT_SCRIPT = (nodes) => `
   root.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483640;';
   document.body.appendChild(root);
 
-  var styleId = '__ghost-overlay-style__';
+  var styleId = '__gt-overlay-style__';
   if (!document.getElementById(styleId)) {
     var s = document.createElement('style');
     s.id = styleId;
     s.textContent = [
-      '.__ghost-box{position:absolute;box-sizing:border-box;pointer-events:all;}',
-      '.__ghost-label{position:absolute;bottom:100%;left:0;margin-bottom:2px;',
-        'background:#050606;border:1px solid currentColor;color:inherit;',
-        'font:bold 10px/1.3 monospace;padding:2px 6px;white-space:nowrap;',
-        'cursor:text;outline:none;min-width:40px;max-width:220px;',
-        'border-radius:3px 3px 0 0;overflow:hidden;text-overflow:ellipsis;}',
-      '.__ghost-x{position:absolute;top:2px;right:2px;width:16px;height:16px;',
+      '@keyframes __gtBloom{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:scale(1)}}',
+      '.__gt-box{position:absolute;box-sizing:border-box;pointer-events:all;border-radius:4px;',
+        'animation:__gtBloom 0.22s cubic-bezier(0.34,1.56,0.64,1) both;}',
+      '.__gt-box--ghost{opacity:0.18!important;border-style:dashed!important;',
+        'pointer-events:none!important;box-shadow:none!important;background:none!important;animation:none!important;}',
+      '.__gt-label{position:absolute;bottom:100%;left:-1px;margin-bottom:3px;',
+        'background:rgba(5,6,6,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);',
+        'border:1px solid currentColor;border-radius:4px 4px 0 0;color:inherit;',
+        'font:700 10px/1.4 monospace;letter-spacing:.07em;padding:2px 8px;',
+        'white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;',
+        'text-shadow:0 0 8px currentColor;cursor:text;outline:none;}',
+      '.__gt-badge{position:absolute;top:3px;left:3px;background:rgba(5,6,6,0.80);',
+        'backdrop-filter:blur(4px);border:1px solid currentColor;border-radius:3px;',
+        'color:inherit;font:700 9px monospace;padding:1px 5px;letter-spacing:.05em;pointer-events:none;}',
+      '.__gt-x{position:absolute;top:3px;right:3px;width:16px;height:16px;',
         'background:#d90429;border:0;border-radius:3px;color:#fff;',
-        'font:bold 10px/16px monospace;cursor:pointer;padding:0;',
-        'display:flex;align-items:center;justify-content:center;z-index:1;}',
+        'font:700 10px/16px monospace;cursor:pointer;padding:0;z-index:1;}',
     ].join('');
     document.head.appendChild(s);
   }
 
+  var masterCount = 0;
   nodes.forEach(function (node) {
     var el;
     try { el = document.querySelector(node.selector); } catch (e) { el = null; }
     if (!el) return;
 
-    var r = el.getBoundingClientRect();
     var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
     var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
+    var r = el.getBoundingClientRect();
     var top = r.top + scrollTop;
     var left = r.left + scrollLeft;
     if (r.width === 0 || r.height === 0) return;
 
-    var color = node.confidence >= 60 ? '#b8ff5a' : '#ff9500';
-    var glow = node.confidence >= 60 ? 'rgba(184,255,90,0.55)' : 'rgba(255,149,0,0.55)';
+    var isGreen = node.confidence >= 60;
+    var color = isGreen ? '#b8ff5a' : '#ff9500';
+    var rgb = isGreen ? '184,255,90' : '255,149,0';
 
     var box = document.createElement('div');
-    box.className = '__ghost-box';
-    box.dataset.ghostIndex = node.index;
+    box.className = '__gt-box' + (node.isGhost ? ' __gt-box--ghost' : '');
+    box.setAttribute('data-test-index', node.index);
     box.style.cssText = [
       'top:' + top + 'px;',
       'left:' + left + 'px;',
       'width:' + r.width + 'px;',
       'height:' + r.height + 'px;',
-      'border:2px solid ' + color + ';',
-      'box-shadow:0 0 8px ' + glow + ',inset 0 0 4px ' + glow + ';',
+      '--gc:' + color + ';--gr:' + rgb + ';',
       'color:' + color + ';',
+      'border:2px solid ' + color + ';',
+      node.isGhost ? '' : [
+        'background:linear-gradient(135deg,rgba(' + rgb + ',0.13) 0%,rgba(' + rgb + ',0.04) 100%);',
+        'box-shadow:',
+          '0 0 0 1px rgba(' + rgb + ',0.28),',
+          '0 0 10px rgba(' + rgb + ',0.55),',
+          '0 0 28px rgba(' + rgb + ',0.28),',
+          '0 6px 20px rgba(0,0,0,0.55);',
+        'animation-delay:' + (node.isMaster ? masterCount * 65 : 0) + 'ms;',
+      ].join(''),
     ].join('');
 
-    var label = document.createElement('div');
-    label.className = '__ghost-label';
-    label.contentEditable = 'true';
-    label.textContent = node.logicalName;
-    label.addEventListener('blur', function () {
-      var updated = label.textContent.trim().replace(/\\s+/g, '-').toLowerCase();
-      if (updated) label.textContent = updated;
-      console.log('[scrapetag:overlay:label]' + JSON.stringify({ index: node.index, logicalName: label.textContent }));
-    });
-    label.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); label.blur(); }
-    });
+    if (node.isMaster) masterCount++;
 
-    var xBtn = document.createElement('button');
-    xBtn.className = '__ghost-x';
-    xBtn.textContent = 'X';
-    xBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      box.remove();
-      console.log('[scrapetag:overlay:exclude]' + JSON.stringify({ index: node.index }));
-    });
+    if (!node.isGhost) {
+      var label = document.createElement('div');
+      label.className = '__gt-label';
+      label.contentEditable = 'true';
+      label.textContent = node.logicalName;
+      label.addEventListener('blur', function () {
+        var updated = label.textContent.trim().replace(/\\s+/g, '-').toLowerCase();
+        if (updated) label.textContent = updated;
+        console.log('[scrapetag:overlay:label]' + JSON.stringify({ index: node.index, logicalName: label.textContent }));
+      });
+      label.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); label.blur(); }
+      });
 
-    box.appendChild(label);
-    box.appendChild(xBtn);
+      if (node.collectionCount > 1) {
+        var badge = document.createElement('div');
+        badge.className = '__gt-badge';
+        badge.textContent = '\\u00d7' + node.collectionCount;
+        box.appendChild(badge);
+      }
+
+      var xBtn = document.createElement('button');
+      xBtn.className = '__gt-x';
+      xBtn.textContent = 'X';
+      xBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        box.remove();
+        console.log('[scrapetag:overlay:exclude]' + JSON.stringify({ index: node.index }));
+      });
+
+      box.appendChild(label);
+      box.appendChild(xBtn);
+    }
+
     root.appendChild(box);
   });
 
-  return { drawn: root.children.length };
+  return { drawn: root.children.length, masters: masterCount };
 })(${JSON.stringify(nodes)})
 `
 
 async function drawHarvestOverlays(webview, nodes) {
   try {
     const result = await webview.executeJavaScript(OVERLAY_INJECT_SCRIPT(nodes), true)
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlays drawn: ${result?.drawn ?? 0} boxes`)
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ✦ ${result?.masters ?? 0} master boxes / ${result?.drawn ?? 0} total rendered`)
   } catch (err) {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] overlay error: ${err.message}`)
   }
