@@ -16,6 +16,8 @@ const staticLogo = document.getElementById('static-logo')
 const NixieTicker = (function () {
   const SPIN = ['◢', '◣', '◤', '◥']
   const SEP = '   •   '
+  const MARQUEE_GAP_PX = 360
+  const MARQUEE_GAP_TEXT = '\u00a0'.repeat(28)
   const IDLE_MSGS = [
     'GHOSTOPS TERMINAL · SCRAPETAG ONLINE · AWAITING HARVEST COMMAND',
     'PRO TIP: DATA-TEST ATTRIBUTES DECOUPLE YOUR SUITE FROM UI CHURN',
@@ -50,15 +52,17 @@ const NixieTicker = (function () {
   function setText(msg, speedPxPerSec) {
     const t = textEl()
     if (!t) return
-    const px = speedPxPerSec || 80
-    const display = `> ${msg}_`
-    t.textContent = display
-    const containerW = t.parentElement ? t.parentElement.offsetWidth : 420
-    const textW = display.length * 6.8
-    const duration = Math.max(5, (containerW + textW) / px)
+    const px = speedPxPerSec || 76
+    const single = `> ${String(msg || '').trim()}_`
+    const marquee = `${single}${MARQUEE_GAP_TEXT}${single}`
+    t.textContent = marquee
+    const laneW = t.parentElement ? t.parentElement.clientWidth : 420
+    const textW = Math.max(t.scrollWidth, single.length * 7)
+    const duration = Math.max(8, (laneW + textW + MARQUEE_GAP_PX) / px)
+    t.style.setProperty('--nixie-marquee-duration', `${duration.toFixed(1)}s`)
     t.style.animation = 'none'
-    void t.offsetHeight
-    t.style.animation = `headerNixieMarquee ${duration.toFixed(1)}s linear infinite`
+    void t.offsetWidth
+    t.style.removeProperty('animation')
   }
 
   function startSpin() {
@@ -92,51 +96,39 @@ const NixieTicker = (function () {
     isActive = true
     setMode('nixie-scroller--scanning')
     startSpin()
-    const domain = url ? url.replace(/https?:\/\//, '').split('/')[0].toUpperCase() : 'TARGET'
-    const seq = [
-      `■ TOTAL RECALL ENGAGED ■ TARGET: ${domain}`,
-      'INITIALIZING CRAWL PROTOCOL · GHOST ENGINE ARMED',
-      'EXECUTING DEEP SCROLL · TRIGGERING LAZY ASSETS',
-    ]
-    let i = 0
-    setText(seq[0], 110)
-    const advance = () => {
-      i++
-      if (i < seq.length) {
-        setText(seq[i], 110)
-        bootTimers.push(setTimeout(advance, 1400))
-      }
-    }
-    bootTimers.push(setTimeout(advance, 1400))
+    setText('HARVEST IN PROGRESS', 80)
   }
 
-  function scan(pass, total) {
-    const pct = Math.round((pass / total) * 100)
-    setText(`SCANNING PAGE · PASS ${pass}/${total} · ${pct}% COMPLETE`, 110)
+  function scan(_pass, _total) {
+    if (!isActive) return
+    setText('HARVEST IN PROGRESS', 80)
   }
 
   function querying() {
     clearBootTimers()
-    setText('HARVEST IN PROGRESS · ANALYZING ALL VISIBLE NODES · PLEASE STAND BY', 85)
+    setText('HARVEST IN PROGRESS', 80)
   }
 
-  function done(stats) {
+  function done(_stats) {
     clearBootTimers()
     isActive = false
     stopSpin()
     setMode('nixie-scroller--done')
-    const msgs = [
-      `■ HARVEST COMPLETE ■ ${stats.total} NODES · ${stats.masters} UNIQUE · ${stats.ghosts} GROUPED`,
-      `CONFIDENCE: ${stats.green} HIGH-CONFIDENCE · ${stats.orange} FRAGILE SELECTORS`,
-      stats.collections > 0 ? `${stats.collections} REPEATING PATTERN COLLECTIONS DETECTED` : 'ALL ELEMENTS STRUCTURALLY UNIQUE',
-      'READY FOR REVIEW · DATA-TEST INJECTION STANDING BY',
-      'CLICK × TO EXCLUDE · CLICK LABEL TO RENAME · THEN INJECT',
-      `SCRAPETAG TOTAL RECALL COMPLETE · ${stats.total} NODES MAPPED`,
-    ]
-    setText(msgs.join(SEP), 68)
+    setText('HARVEST COMPLETE', 76)
   }
 
-  return { idle, boot, scan, querying, done }
+  function announce(msg, speedPxPerSec = 76) {
+    isActive = false
+    stopSpin()
+    setMode(null)
+    setText(msg, speedPxPerSec)
+  }
+
+  function isBusy() {
+    return isActive
+  }
+
+  return { idle, boot, scan, querying, done, announce, isBusy }
 })()
 
 if (introVid && staticLogo) {
@@ -515,8 +507,7 @@ function setChip(text) {
 }
 
 function updateNixieReadout(plainText) {
-  const el = document.querySelector('.nixie-text')
-  if (!el || !plainText) return
+  if (!plainText) return
   const max = 220
   let t = plainText.length > max ? `${plainText.slice(0, max - 3)}...` : plainText
   if (!t.startsWith('>')) {
@@ -525,7 +516,7 @@ function updateNixieReadout(plainText) {
   if (!t.endsWith('_')) {
     t += '_'
   }
-  el.textContent = t
+  NixieTicker.announce(t.replace(/^>\s*/, '').replace(/_$/, ''), 76)
 }
 
 function updateSelectorHud(alias, selector) {
@@ -647,12 +638,12 @@ function appendTerminalLine(text) {
     .filter((line) => line.length > 0)
 
   normalized.forEach((line) => {
-    if (line.includes('[CAPTURED]')) {
+    if (line.includes('[CAPTURED]') && !NixieTicker.isBusy()) {
       const cap = line.match(/\[CAPTURED\]\s+(.+?)\s+->\s+(.+)/)
       if (cap) {
         updateNixieReadout(`CAPTURE :: ${cap[1].trim()} :: ${cap[2].trim()}`)
       }
-    } else if (line.includes('[scrapetag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
+    } else if (!NixieTicker.isBusy() && line.includes('[scrapetag]') && (line.includes('launching in-app') || line.includes('webview ready'))) {
       updateNixieReadout(line.replace(/^\[[^\]]+\]\s*/, '').trim())
     } else if (line.includes('[Spooler]') && line.toLowerCase().includes('streamlit exited')) {
       spoolerHarnessActive = false
@@ -1188,11 +1179,41 @@ const HARVEST_NODE_SCRIPT = `
     return label.length > 80 ? label.slice(0, 80) + '...' : label;
   }
 
-  function isRendered(el) {
+  function isRendered(el, style) {
+    if (el.hidden) return false;
+    if (style.display === 'none' || style.visibility === 'hidden' || style.contentVisibility === 'hidden') return false;
+    if (el.getAttribute('aria-hidden') === 'true' && style.pointerEvents === 'none') return false;
     if (el.offsetWidth > 0 || el.offsetHeight > 0) return true;
+    if (el.getClientRects && el.getClientRects().length > 0) return true;
     var rect = el.getBoundingClientRect();
     if (rect.width > 0 || rect.height > 0) return true;
     return false;
+  }
+
+  function buildIdentityTuple(el, label, rect) {
+    var tag = (el.tagName || '').toLowerCase();
+    var role = (el.getAttribute('role') || '').toLowerCase();
+    var id = (el.id || '').trim();
+    var stableData = (
+      el.getAttribute('data-testid') ||
+      el.getAttribute('data-test') ||
+      el.getAttribute('data-cy') ||
+      el.getAttribute('data-qa') ||
+      ''
+    ).trim();
+    var href = (el.getAttribute('href') || '').trim().slice(0, 120);
+    var src = (el.getAttribute('src') || '').trim().slice(0, 120);
+    var action = (el.getAttribute('action') || '').trim().slice(0, 120);
+    var name = (el.getAttribute('name') || '').trim().slice(0, 60);
+    var type = (el.getAttribute('type') || '').trim().slice(0, 32);
+    var normLabel = (label || '').trim().replace(/\\s+/g, ' ').slice(0, 80);
+    var rectSig = [
+      Math.round(rect.left),
+      Math.round(rect.top),
+      Math.round(rect.width),
+      Math.round(rect.height),
+    ].join(',');
+    return [tag, role, id, stableData, href, src, action, name, type, normLabel, rectSig].join('|');
   }
 
   function nodeType(el) {
@@ -1226,20 +1247,23 @@ const HARVEST_NODE_SCRIPT = `
     matches.forEach(function(el) {
       var tag = el.tagName.toLowerCase();
       if (SKIP_TAGS.has(tag)) return;
-      if (!isRendered(el)) return;
       var style = window.getComputedStyle(el);
-      if (style.display === 'none' || style.visibility === 'hidden') return;
+      if (!isRendered(el, style)) return;
       var sel = buildSelector(el);
-      if (!sel || seen.has(sel)) return;
-      seen.add(sel);
+      if (!sel) return;
       var rect = el.getBoundingClientRect();
+      var label = getLabel(el);
+      var identity = buildIdentityTuple(el, label, rect);
+      var dedupKey = sel + '||' + identity;
+      if (seen.has(dedupKey)) return;
+      seen.add(dedupKey);
       var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
       var scrollLeft = window.scrollX || document.documentElement.scrollLeft || 0;
       nodes.push({
         index: nodes.length,
         type: nodeType(el),
         selector: sel,
-        label: getLabel(el),
+        label: label,
         patternSig: buildPatternSignature(el),
         rect: {
           x: Math.round(rect.x + scrollLeft),
@@ -1293,6 +1317,8 @@ function extractNamespace(selector) {
 function semanticSuffix(node) {
   const type = node.type
   const label = (node.label || '').toLowerCase()
+  const isPlayLike = /(^|\b)(play|watch|video)(\b|$)/i.test(label)
+  if (isPlayLike && (type === 'button' || type === 'link' || type === 'svg' || type.startsWith('role[button') || type === 'div')) return 'play-btn'
   if (type === 'link') return 'link'
   if (type === 'button' || type.startsWith('role[button')) {
     if (/play|launch|start|run/i.test(label)) return 'play-btn'
@@ -1338,6 +1364,9 @@ function deriveLogicalName(node) {
       const suffix = semanticSuffix(node)
       if (suffix.endsWith('-container') || suffix === 'nav-container' || suffix === 'header-bar' || suffix === 'footer-bar' || suffix === 'main-container') {
         return `${base}-container`
+      }
+      if (/(^|-)btn$/.test(suffix) && !base.endsWith(`-${suffix}`)) {
+        return `${base}-${suffix}`
       }
       return base
     }
