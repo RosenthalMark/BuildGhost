@@ -476,11 +476,7 @@ function setStageIdentity() {
   const nixieShell = document.getElementById('nixie-scroller')
 
   if (nixieShell) {
-    if (activeRoute === 'tool' && activeTool === 'Spooler') {
-      nixieShell.style.setProperty('--nixie-header-skin', 'url("../Toolbelt/Spooler/assets/Spooler_led_scroller.png")')
-    } else {
-      nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/core/Nixie_led_scroller.png")')
-    }
+    nixieShell.style.setProperty('--nixie-header-skin', 'url("assets/core/Nixie_led_scroller.png")')
   }
 
   if (activeRoute === 'docs') {

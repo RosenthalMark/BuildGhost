@@ -593,7 +593,7 @@ body {
   border-radius: 8px;
   pointer-events: none;
   opacity: 0.58;
-  background-image: var(--nixie-header-skin, url("assets/modules/scrapetag/scrapetag-selector-display.png"));
+  background-image: var(--nixie-header-skin, url("assets/core/Nixie_led_scroller.png"));
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
