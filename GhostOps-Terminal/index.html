@@ -159,29 +159,34 @@
           <header class="runner-command-row">
             <h3>Tactical Runner</h3>
             <div class="runner-launch-wrap">
-              <button
-                id="launch-scrape-btn"
-                type="button"
-                class="launch-spacebar-key"
-                aria-label="Launch in-app scrape session"
-              >
-                <span class="launch-key-bezel">
-                  <span class="launch-key-label-root" aria-hidden="true"></span>
-                </span>
-              </button>
-            </div>
-            <div class="runner-actions" data-scrapetag-only>
-              <button id="pause-resume-btn" class="img-btn" aria-label="Pause Crawler" data-state="running">
-                <img id="pause-resume-img" src="assets/modules/scrapetag/pause-crawler.gif" alt="Pause Crawler" class="tactical-img" />
-              </button>
-              <span class="dom-override-label" id="pause-resume-label">[ PAUSE CRAWLER ]</span>
+              <div class="runner-key-stack">
+                <p class="runner-key-caption">CLICK TO LOAD TARGET PAGE</p>
+                <button
+                  id="launch-scrape-btn"
+                  type="button"
+                  class="launch-spacebar-key"
+                  aria-label="Launch in-app scrape session"
+                >
+                  <span class="launch-key-bezel">
+                    <span class="launch-key-label-root" aria-hidden="true"></span>
+                  </span>
+                </button>
+              </div>
+              <div class="runner-key-stack" data-scrapetag-only>
+                <p class="runner-key-caption">CLICK TO START SELECTOR HARVEST</p>
+                <button
+                  id="start-harvest-btn"
+                  class="launch-spacebar-key harvest-spacebar-key"
+                  type="button"
+                  aria-label="Start Harvest"
+                >
+                  <span class="launch-key-bezel">
+                    <span class="launch-key-label-root" aria-hidden="true"></span>
+                  </span>
+                </button>
+              </div>
             </div>
           </header>
-
-          <div class="session-control-bar" data-scrapetag-only>
-            <p>In-App Target Session</p>
-            <button id="rearm-tagger" class="secondary-action">REARM TAGGER</button>
-          </div>
 
           <div class="scrape-url-bar" data-scrapetag-only>
             <label class="scrape-url-label" for="scrape-target-url">TARGET URL</label>
@@ -211,16 +216,6 @@
               <button id="wv-forward" class="wv-nav-btn" type="button" aria-label="Go forward" title="Forward">&#8594;</button>
               <button id="wv-reload" class="wv-nav-btn" type="button" aria-label="Reload page" title="Reload">&#8635;</button>
               <span id="wv-current-url" class="wv-current-url"></span>
-              <button
-                id="start-harvest-btn"
-                class="launch-spacebar-key harvest-spacebar-key"
-                type="button"
-                aria-label="Start Harvest"
-              >
-                <span class="launch-key-bezel">
-                  <span class="launch-key-label-root" aria-hidden="true"></span>
-                </span>
-              </button>
             </nav>
             <webview
               id="scrape-webview"

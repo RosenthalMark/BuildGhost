@@ -33,15 +33,27 @@ const NixieTicker = (function () {
   let isActive = false
   let bootTimers = []
   let lastRenderedBaseMessage = ''
+  let postDoneTimer = null
 
   function clearBootTimers() {
     bootTimers.forEach((id) => clearTimeout(id))
     bootTimers = []
   }
 
+  function clearPostDoneTimer() {
+    if (postDoneTimer) {
+      clearTimeout(postDoneTimer)
+      postDoneTimer = null
+    }
+  }
+
   function textEl() { return document.querySelector('.nixie-text') }
   function spinnerEl() { return document.getElementById('nixie-spinner') }
   function scrollerEl() { return document.getElementById('nixie-scroller') }
+  function laneEl() {
+    const t = textEl()
+    return t && t.parentElement ? t.parentElement : null
+  }
 
   function setMode(cls) {
     const s = scrollerEl()
@@ -90,6 +102,7 @@ const NixieTicker = (function () {
   }
 
   function idle() {
+    clearPostDoneTimer()
     if (isActive) return
     stopSpin()
     setMode(null)
@@ -97,6 +110,7 @@ const NixieTicker = (function () {
   }
 
   function boot(url) {
+    clearPostDoneTimer()
     clearBootTimers()
     isActive = true
     setMode('nixie-scroller--scanning')
@@ -109,19 +123,35 @@ const NixieTicker = (function () {
   }
 
   function querying() {
+    clearPostDoneTimer()
     clearBootTimers()
     setText('HARVEST IN PROGRESS', 80)
   }
 
-  function done(_stats) {
+  function done(_stats, captureFeed = []) {
+    clearPostDoneTimer()
     clearBootTimers()
     isActive = false
     stopSpin()
     setMode('nixie-scroller--done')
     setText('HARVEST COMPLETE', 76)
+    const items = Array.isArray(captureFeed)
+      ? captureFeed.map((s) => String(s || '').trim()).filter(Boolean)
+      : []
+    if (items.length > 0) {
+      const laneW = laneEl() ? laneEl().clientWidth : 420
+      // Wait until "HARVEST COMPLETE" has crossed the center of the nixie lane.
+      const centerCrossMs = Math.round(((laneW * 0.5) / 76) * 1000)
+      const handoffDelayMs = Math.max(2600, Math.min(6500, centerCrossMs + 950))
+      postDoneTimer = setTimeout(() => {
+        setMode(null)
+        setText(items.join(SEP), 70)
+      }, handoffDelayMs)
+    }
   }
 
   function announce(msg, speedPxPerSec = 76) {
+    clearPostDoneTimer()
     isActive = false
     stopSpin()
     setMode(null)
@@ -1419,7 +1449,7 @@ function semanticSuffix(node, selector = '') {
   if (hasAny(['author', 'meta', 'byline', 'date', 'time', 'timestamp'])) return 'meta'
   if (/^\s*(\d+([.,]\d+)?\s*(%|x|yrs?|years?)?)\s*$/.test(label)) return 'metric'
   const isPlayLike = /(^|\b)(play|watch|video)(\b|$)/i.test(label)
-  if (isPlayLike && (type === 'button' || type === 'link' || type === 'svg' || type.startsWith('role[button') || type === 'div')) return 'play-btn'
+  if (isPlayLike && (type === 'button' || type === 'link' || type === 'svg' || type.startsWith('role[button'))) return 'play-btn'
   if (type === 'link') return 'link'
   if (type === 'button' || type.startsWith('role[button')) {
     if (/play|launch|start|run/i.test(label)) return 'play-btn'
@@ -1452,6 +1482,22 @@ function semanticSuffix(node, selector = '') {
   return 'container'
 }
 
+function deriveActionLabelSlug(node) {
+  const raw = (node.label || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!raw) return ''
+  const STOP = new Set(['link', 'button', 'btn', 'click', 'tap', 'go', 'to'])
+  const tokens = raw
+    .split(' ')
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !STOP.has(t))
+    .slice(0, 3)
+  return tokens.join('-')
+}
+
 function deriveLogicalName(node) {
   const sel = node.selector || ''
   let name
@@ -1479,9 +1525,16 @@ function deriveLogicalName(node) {
   if (!name) {
     const namespace = extractNamespace(sel)
     const suffix = semanticSuffix(node, sel)
+    const actionSlug = deriveActionLabelSlug(node)
 
     if (namespace) {
-      name = `${namespace}-${suffix}`
+      if (suffix === 'link' && actionSlug) {
+        name = `${namespace}-${actionSlug}-link`
+      } else if (/(^|-)btn$/.test(suffix) && actionSlug) {
+        name = `${namespace}-${actionSlug}-${suffix}`
+      } else {
+        name = `${namespace}-${suffix}`
+      }
     } else {
       const raw = (node.label || node.type)
         .toLowerCase()
@@ -1515,7 +1568,23 @@ function deriveGroupKey(node) {
   const w = Math.max(1, Number(rect.width) || 1)
   const h = Math.max(1, Number(rect.height) || 1)
   const sizeBucket = `${Math.max(1, Math.round(w / 120))}x${Math.max(1, Math.round(h / 48))}`
-  return [namespace, suffix, baseType, sizeBucket].join('|')
+  const normalizedLabel = (node.label || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Keep anti-flood grouping, but preserve short CTA siblings like EMAIL/LINKEDIN/GITHUB.
+  const shortActionLabel =
+    normalizedLabel &&
+    normalizedLabel.length <= 18 &&
+    normalizedLabel.split(' ').length <= 3
+      ? normalizedLabel
+      : ''
+  const actionBucket =
+    (baseType === 'link' || baseType === 'button') && shortActionLabel
+      ? `action:${shortActionLabel}`
+      : 'action:*'
+  return [namespace, suffix, baseType, sizeBucket, actionBucket].join('|')
 }
 
 function applyPatternGroups(nodes) {
@@ -1648,8 +1717,12 @@ async function harvestInteractiveNodes(webview) {
   const green = masters.filter((n) => n.confidence >= 60).length
   const orange = masters.filter((n) => n.confidence < 60).length
   const collections = masters.filter((n) => n.collectionCount > 1).length
+  const captureFeed = masters.map((n) => n.logicalName).filter(Boolean)
 
-  NixieTicker.done({ total: nodes.length, masters: masters.length, ghosts: ghosts.length, green, orange, collections })
+  NixieTicker.done(
+    { total: nodes.length, masters: masters.length, ghosts: ghosts.length, green, orange, collections },
+    captureFeed
+  )
 
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL COMPLETE ──`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ${nodes.length} nodes total | ${masters.length} unique | ${ghosts.length} grouped`)
@@ -1825,7 +1898,6 @@ function handleOverlayMessage(msg) {
 function launchScrapeSession() {
   const scrapeShell = document.getElementById('scrape-shell')
   const webview = document.getElementById('scrape-webview')
-  const rearmBtn = document.getElementById('rearm-tagger')
   const urlInput = document.getElementById('scrape-target-url')
 
   if (!scrapeShell || !webview) {
@@ -1855,18 +1927,6 @@ function launchScrapeSession() {
   bindScrapeWebview(webview)
   appendTerminalLine(`[${isoStamp()}] [scrapetag] launching in-app session: ${targetUrl}`)
   webview.src = targetUrl
-
-  if (rearmBtn && rearmBtn.dataset.bound !== '1') {
-    rearmBtn.dataset.bound = '1'
-    rearmBtn.addEventListener('click', async () => {
-      try {
-        await armScrapeTagger(webview)
-        appendTerminalLine(`[${isoStamp()}] [scrapetag] tagger rearmed`)
-      } catch (error) {
-        appendTerminalLine(`[${isoStamp()}] [scrapetag] rearm failed: ${error.message}`)
-      }
-    })
-  }
 }
 
 async function launchEnvHarness(toolInfo = null, { auto = false } = {}) {
@@ -1994,6 +2054,7 @@ function renderRunnerState(toolName, toolInfo) {
   const scrapeShell = view.querySelector('#scrape-shell')
   const spoolerShell = view.querySelector('#spooler-shell')
   const runnerChip = view.querySelector('.runner-chip')
+  const runnerCommandRow = view.querySelector('.runner-command-row')
 
   if (terminalLogBuffer.length === 0) {
     appendTerminalLine(`[${isoStamp()}] ${toolName} entrypoint discovered`)
@@ -2003,9 +2064,11 @@ function renderRunnerState(toolName, toolInfo) {
 
   const scrapeOnlyNodes = Array.from(view.querySelectorAll('[data-scrapetag-only]'))
   if (toolName === 'scrapetag') {
+    if (runnerCommandRow) runnerCommandRow.classList.add('runner-command-row--scrapetag')
     if (runnerChip) runnerChip.textContent = 'in-app-ready'
     if (spoolerShell) spoolerShell.remove()
   } else {
+    if (runnerCommandRow) runnerCommandRow.classList.remove('runner-command-row--scrapetag')
     if (scrapeShell) scrapeShell.remove()
     scrapeOnlyNodes.forEach((node) => node.remove())
     if (toolName === 'Spooler') {
@@ -2036,7 +2099,7 @@ function renderRunnerState(toolName, toolInfo) {
   const launchMounted = document.getElementById('launch-scrape-btn')
   if (launchMounted) {
     if (toolName === 'scrapetag') {
-      initLaunchSpacebarKey(launchMounted, { label: 'LAUNCH IN-APP SCRAPE', enableCycle: true })
+      initLaunchSpacebarKey(launchMounted, { label: 'LOAD TARGET SITE', enableCycle: true })
     } else if (toolName === 'Spooler') {
       setLaunchKeyStaticLabel(launchMounted, 'LAUNCH ENV HARNESS')
     } else {
@@ -2164,27 +2227,6 @@ function renderRunnerState(toolName, toolInfo) {
     }
   }
 
-  // PAUSE / RESUME toggle
-  const pauseBtn = document.getElementById('pause-resume-btn')
-  const pauseImg = document.getElementById('pause-resume-img')
-  const pauseLabel = document.getElementById('pause-resume-label')
-
-  if (toolName === 'scrapetag' && pauseBtn && pauseImg && pauseLabel) {
-    pauseBtn.addEventListener('click', () => {
-      const isRunning = pauseBtn.dataset.state === 'running'
-      if (isRunning) {
-        pauseImg.src = 'assets/modules/scrapetag/resume-crawler.gif'
-        pauseBtn.setAttribute('aria-label', 'Resume Crawler')
-        pauseLabel.textContent = '[ RESUME CRAWLER ]'
-        pauseBtn.dataset.state = 'paused'
-      } else {
-        pauseImg.src = 'assets/modules/scrapetag/pause-crawler.gif'
-        pauseBtn.setAttribute('aria-label', 'Pause Crawler')
-        pauseLabel.textContent = '[ PAUSE CRAWLER ]'
-        pauseBtn.dataset.state = 'running'
-      }
-    })
-  }
   terminalLogNode = document.getElementById('terminal-log')
   if (terminalLogNode) terminalLogNode.innerHTML = terminalLogBuffer.join('\n')
   if (terminalLogNode) terminalLogNode.scrollTop = terminalLogNode.scrollHeight
