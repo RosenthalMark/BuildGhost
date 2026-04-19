@@ -30,6 +30,52 @@ Intelligent DOM mapping helper: capture interactive elements, assign human-reada
 - Entry file: `index.js` (must exist for the Terminal “module online” check).
 - Renderer talks to the page only through the webview injection in `ghostops-terminal/renderer.js` (`armScrapeTagger`); there is no Node access in the UI process.
 
+## Confidence scoring (green vs orange)
+
+Scrapetag assigns every harvested selector a confidence score from `0` to `100`, then colors the overlay:
+
+- `green` when score is `>= 60`
+- `orange` when score is `< 60`
+
+This is not vibe-based; it is deterministic selector math from `scoreNodeConfidence()` in `GhostOps-Terminal/renderer.js`.
+
+### Scoring formula
+
+```text
+start at 50
++50  if selector starts with ID         (^#[a-zA-Z])
++30  if selector includes data attribute (\[data-)
++15  if selector includes aria label     (aria-label|aria-labelledby)
+-35  if selector uses nth-of-type        (nth-of-type)
+-20  if selector depth >= 4 and not ID-rooted
+-10  if selector contains generic tokens (btn|el|item|wrap|container|inner|outer|root|box)
+clamp final value to [0, 100]
+```
+
+### What each signal means
+
+| Signal | Why it helps/hurts |
+| --- | --- |
+| Starts with `#id` | Usually the strongest anchor on a page. |
+| Contains `[data-*]` | Indicates test- or app-level intent instead of layout trivia. |
+| Contains `aria-label` / `aria-labelledby` | Often a stable semantic hook tied to UX meaning. |
+| Uses `nth-of-type` | Position-based selectors drift when sibling order changes. |
+| Deep `>` chains | Long ancestry chains are brittle in modern component trees. |
+| Generic tokens | Names like `container`/`wrap`/`item` carry weak semantic identity. |
+
+### Fast examples
+
+| Selector | Score | Tier |
+| --- | ---: | --- |
+| `#login-button` | `100` (`50 + 50`, clamped) | Green |
+| `[data-testid="email"]` | `80` (`50 + 30`) | Green |
+| `main > section > div > ul > li:nth-of-type(2) > button` | `0` (`50 - 35 - 20 - 10`, then clamped) | Orange |
+| `header > .nav-wrap > .item > a` | `20` (`50 - 20 - 10`) | Orange |
+
+### Operator note
+
+Strict Mode currently improves naming/grouping behavior, but this numeric confidence rubric remains the same unless `scoreNodeConfidence()` changes.
+
 ## Known limits
 
 - Captures are held in main-process memory (`currentSessionLogs` in `main.js`); no export file yet.

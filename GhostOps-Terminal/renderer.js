@@ -508,6 +508,16 @@ const toolConfig = {
     description: 'BLACKbox conversion runtime is not present. Initialize to scaffold migration adapters and compatibility checks.',
     expectedPath: '../Toolbelt/BlackBox/index.js'
   },
+  Cypress: {
+    preview: '../Toolbelt/Cypress/assets/Cypress.png',
+    description: 'Cypress runtime is not present. Initialize to scaffold end-to-end browser automation entrypoints.',
+    expectedPath: '../Toolbelt/Cypress/index.js'
+  },
+  Playwright: {
+    preview: '../Toolbelt/Playwright/assets/Playwright.png',
+    description: 'Playwright runtime is not present. Initialize to scaffold browser automation orchestration hooks.',
+    expectedPath: '../Toolbelt/Playwright/index.js'
+  },
   Spooler: {
     preview: 'assets/core/GHOSTops-terminal-logo-2.png',
     description: 'SPOOLER harness is not present. Initialize to scaffold the reproducible hostile-environment runtime bridge.',

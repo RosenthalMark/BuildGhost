@@ -6,7 +6,7 @@ const { spawn, spawnSync } = require('child_process')
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
 const SPOOLER_APP_ROOT = path.join(TOOL_ROOT, 'Spooler')
 const SPOOLER_VENV_PYTHON = path.join(SPOOLER_APP_ROOT, 'venv', 'bin', 'python')
-const ALLOWED_TOOLS = new Set(['scrapetag', 'GHOSTstub', 'BlackBox', 'Spooler'])
+const ALLOWED_TOOLS = new Set(['scrapetag', 'GHOSTstub', 'BlackBox', 'Cypress', 'Playwright', 'Spooler'])
 const TOOL_README_URLS = Object.freeze({
   BlackBox: 'https://github.com/RosenthalMark/BuildGhost/blob/main/Toolbelt/BlackBox/README.md'
 })

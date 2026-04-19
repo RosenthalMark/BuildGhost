@@ -618,9 +618,15 @@ body {
   min-width: max-content;
   padding-left: 100%;
   white-space: nowrap;
+  font-size: 0.66rem;
   line-height: 1;
+  letter-spacing: 0.09em;
   animation: headerNixieMarquee var(--nixie-marquee-duration, 24s) linear infinite;
   will-change: transform;
+}
+
+.nixie-scroller--header .nixie-spinner {
+  font-size: 0.66rem;
 }
 
 .nixie-scroller:hover {
