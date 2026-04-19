@@ -189,6 +189,7 @@ const POLL_INTERVAL_MS = 2500
 const MODULE_DOCK_STORAGE_KEY = 'ghostops_module_dock_collapsed'
 const DEFAULT_SCRAPE_URL = 'https://testghost.com'
 const SCRAPE_URL_STORAGE_KEY = 'ghostops_scrape_target_url'
+const STRICT_HARVEST_STORAGE_KEY = 'ghostops_scrape_strict_mode'
 const SPOOLER_UI_URL = 'http://127.0.0.1:8512'
 
 function resolveScrapeTargetUrl(raw) {
@@ -217,6 +218,25 @@ function resolveScrapeTargetUrl(raw) {
   }
 }
 
+function isStrictHarvestEnabled() {
+  try {
+    return localStorage.getItem(STRICT_HARVEST_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setStrictHarvestEnabled(enabled) {
+  const next = enabled ? '1' : '0'
+  try {
+    localStorage.setItem(STRICT_HARVEST_STORAGE_KEY, next)
+  } catch {
+    /* ignore */
+  }
+  const toggle = document.getElementById('strict-harvest-toggle')
+  if (toggle) toggle.checked = Boolean(enabled)
+}
+
 let activeRoute = 'tool'
 let activeTool = 'scrapetag'
 let lastCapturedAlias = ''
@@ -230,6 +250,8 @@ const toolCache = new Map()
 let selectorCaptureBridgeBound = false
 let lastCaptureFingerprint = ''
 let lastCaptureAt = 0
+let strictSuggestModalEl = null
+const strictSuggestionSeenForUrl = new Set()
 const launchKeyAnimGenByButton = new WeakMap()
 
 function bumpLaunchKeyGen(button) {
@@ -1498,7 +1520,8 @@ function deriveActionLabelSlug(node) {
   return tokens.join('-')
 }
 
-function deriveLogicalName(node) {
+function deriveLogicalName(node, options = {}) {
+  const strictMode = Boolean(options.strictMode)
   const sel = node.selector || ''
   let name
 
@@ -1523,7 +1546,12 @@ function deriveLogicalName(node) {
   }
 
   if (!name) {
-    const namespace = extractNamespace(sel)
+    let namespace = extractNamespace(sel)
+    if (strictMode && namespace) {
+      if (/default-ltr|cache|[a-z0-9]{7,}/i.test(namespace) || /\d/.test(namespace)) {
+        namespace = null
+      }
+    }
     const suffix = semanticSuffix(node, sel)
     const actionSlug = deriveActionLabelSlug(node)
 
@@ -1556,9 +1584,15 @@ function deriveLogicalName(node) {
   return name
 }
 
-function deriveGroupKey(node) {
+function deriveGroupKey(node, options = {}) {
+  const strictMode = Boolean(options.strictMode)
   const selector = node.selector || ''
-  const namespace = extractNamespace(selector) || 'global'
+  let namespace = extractNamespace(selector) || 'global'
+  if (strictMode && namespace !== 'global') {
+    if (/default-ltr|cache|[a-z0-9]{7,}/i.test(namespace) || /\d/.test(namespace)) {
+      namespace = 'global'
+    }
+  }
   const suffix = semanticSuffix(node, selector)
   const baseType = (node.type || '')
     .replace(/\[.*?\]/g, '')
@@ -1587,16 +1621,16 @@ function deriveGroupKey(node) {
   return [namespace, suffix, baseType, sizeBucket, actionBucket].join('|')
 }
 
-function applyPatternGroups(nodes) {
+function applyPatternGroups(nodes, options = {}) {
   const groups = new Map()
   nodes.forEach((node) => {
-    const sig = deriveGroupKey(node)
+    const sig = deriveGroupKey(node, options)
     if (!groups.has(sig)) groups.set(sig, [])
     groups.get(sig).push(node)
   })
 
   nodes.forEach((node) => {
-    const group = groups.get(deriveGroupKey(node))
+    const group = groups.get(deriveGroupKey(node, options))
     const isMaster = group[0].index === node.index
     node.isMaster = isMaster
     node.isGhost = !isMaster
@@ -1674,7 +1708,71 @@ async function runHarvestPass(webview, passLabel) {
   return raw
 }
 
-async function harvestInteractiveNodes(webview) {
+function computeSelectorNoiseStats(masters) {
+  const noisyPattern = /(default-ltr|cache-|_[a-z0-9]{5,}|[a-z]{1,4}\d[a-z0-9-]{4,}|[a-z0-9]{8,}-[a-z0-9]{6,})/i
+  const total = Array.isArray(masters) ? masters.length : 0
+  if (!total) return { total: 0, noisy: 0, ratio: 0 }
+  let noisy = 0
+  masters.forEach((node) => {
+    const sig = `${node?.logicalName || ''}|${node?.selector || ''}`
+    if (noisyPattern.test(sig)) noisy += 1
+  })
+  return { total, noisy, ratio: noisy / total }
+}
+
+function closeStrictSuggestModal() {
+  if (strictSuggestModalEl) {
+    strictSuggestModalEl.remove()
+    strictSuggestModalEl = null
+  }
+}
+
+function showStrictSuggestModal({ noisy, total, onRerun, onKeep }) {
+  closeStrictSuggestModal()
+  const overlay = document.createElement('div')
+  overlay.className = 'strict-suggest-modal'
+  overlay.innerHTML = `
+    <div class="strict-suggest-card" role="dialog" aria-modal="true" aria-label="Strict mode suggestion">
+      <p class="strict-suggest-title">Dynamic Selector Noise Detected</p>
+      <p class="strict-suggest-text">${noisy}/${total} captured tags look highly dynamic. Re-running in Strict Mode can produce cleaner, test-ready names.</p>
+      <div class="strict-suggest-actions">
+        <button type="button" class="strict-suggest-btn" data-strict-choice="keep">Keep current tags</button>
+        <button type="button" class="strict-suggest-btn strict-suggest-btn--primary" data-strict-choice="rerun">RERUN IN STRICT MODE</button>
+      </div>
+    </div>
+  `
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) {
+      closeStrictSuggestModal()
+      onKeep?.()
+    }
+  })
+  const keepBtn = overlay.querySelector('[data-strict-choice="keep"]')
+  const rerunBtn = overlay.querySelector('[data-strict-choice="rerun"]')
+  if (keepBtn) {
+    keepBtn.addEventListener('click', () => {
+      closeStrictSuggestModal()
+      onKeep?.()
+    })
+  }
+  if (rerunBtn) {
+    rerunBtn.addEventListener('click', () => {
+      closeStrictSuggestModal()
+      onRerun?.()
+    })
+  }
+  strictSuggestModalEl = overlay
+  const stageWrap = document.querySelector('.stage-wrap')
+  if (stageWrap) {
+    overlay.classList.add('strict-suggest-modal--stage')
+    stageWrap.appendChild(overlay)
+  } else {
+    document.body.appendChild(overlay)
+  }
+}
+
+async function harvestInteractiveNodes(webview, options = {}) {
+  const strictMode = options.forceStrict != null ? Boolean(options.forceStrict) : isStrictHarvestEnabled()
   const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
   if (!url || url === 'about:blank') {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no page loaded — launch a session first`)
@@ -1683,6 +1781,7 @@ async function harvestInteractiveNodes(webview) {
 
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── TOTAL RECALL INITIATED ──`)
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] target: ${url}`)
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] mode: ${strictMode ? 'strict' : 'normal'}`)
   NixieTicker.boot(url)
 
   try {
@@ -1705,10 +1804,10 @@ async function harvestInteractiveNodes(webview) {
   const withGroups = applyPatternGroups(rawNodes.map((node) => ({
     ...node,
     confidence: scoreNodeConfidence(node.selector),
-  })))
+  })), { strictMode })
   const nodes = withGroups.map((node) => ({
     ...node,
-    logicalName: deriveLogicalName(node),
+    logicalName: deriveLogicalName(node, { strictMode }),
   }))
   lastHarvestNodes = nodes
 
@@ -1737,6 +1836,27 @@ async function harvestInteractiveNodes(webview) {
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] ── rendering overlays... ──`)
 
   await drawHarvestOverlays(webview, nodes)
+
+  if (!strictMode && !options.fromSuggestion) {
+    const stats = computeSelectorNoiseStats(masters)
+    const shouldSuggest = stats.total >= 20 && stats.noisy >= 8 && stats.ratio >= 0.28
+    const suggestionKey = `${url}::normal`
+    if (shouldSuggest && !strictSuggestionSeenForUrl.has(suggestionKey)) {
+      strictSuggestionSeenForUrl.add(suggestionKey)
+      showStrictSuggestModal({
+        noisy: stats.noisy,
+        total: stats.total,
+        onKeep: () => {
+          appendTerminalLine(`[${isoStamp()}] [scrapetag:strict] kept current tags`)
+        },
+        onRerun: async () => {
+          setStrictHarvestEnabled(true)
+          appendTerminalLine(`[${isoStamp()}] [scrapetag:strict] strict mode rerun requested`)
+          await harvestInteractiveNodes(webview, { forceStrict: true, fromSuggestion: true })
+        },
+      })
+    }
+  }
 }
 
 const OVERLAY_INJECT_SCRIPT = (nodes) => `
@@ -1896,6 +2016,7 @@ function handleOverlayMessage(msg) {
 }
 
 function launchScrapeSession() {
+  closeStrictSuggestModal()
   const scrapeShell = document.getElementById('scrape-shell')
   const webview = document.getElementById('scrape-webview')
   const urlInput = document.getElementById('scrape-target-url')
@@ -2043,6 +2164,7 @@ async function renderMissingState(toolName, toolInfo) {
 }
 
 function renderRunnerState(toolName, toolInfo) {
+  closeStrictSuggestModal()
   if (toolName === 'BlackBox') {
     renderBlackBoxHoldingState('state-b')
     return
@@ -2109,6 +2231,7 @@ function renderRunnerState(toolName, toolInfo) {
 
   if (toolName === 'scrapetag') {
     const urlField = document.getElementById('scrape-target-url')
+    const strictToggle = document.getElementById('strict-harvest-toggle')
     if (urlField) {
       const stored = localStorage.getItem(SCRAPE_URL_STORAGE_KEY)
       urlField.value = stored && resolveScrapeTargetUrl(stored) ? stored : DEFAULT_SCRAPE_URL
@@ -2117,6 +2240,15 @@ function renderRunnerState(toolName, toolInfo) {
           e.preventDefault()
           launchScrapeSession()
         }
+      })
+    }
+    if (strictToggle && !strictToggle.dataset.bound) {
+      strictToggle.dataset.bound = '1'
+      strictToggle.checked = isStrictHarvestEnabled()
+      strictToggle.addEventListener('change', () => {
+        const enabled = Boolean(strictToggle.checked)
+        setStrictHarvestEnabled(enabled)
+        appendTerminalLine(`[${isoStamp()}] [scrapetag:strict] mode ${enabled ? 'enabled' : 'disabled'}`)
       })
     }
   }
@@ -2221,6 +2353,7 @@ function renderRunnerState(toolName, toolInfo) {
     if (harvestBtn) {
       initLaunchSpacebarKey(harvestBtn, { label: 'START HARVEST', enableCycle: true })
       harvestBtn.addEventListener('click', () => {
+        closeStrictSuggestModal()
         const wv = document.getElementById('scrape-webview')
         if (wv) harvestInteractiveNodes(wv)
       })

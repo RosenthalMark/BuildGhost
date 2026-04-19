@@ -469,6 +469,7 @@ body {
 }
 
 .stage-wrap {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
@@ -924,7 +925,7 @@ body {
 
 .runner-command-row {
   display: grid;
-  grid-template-columns: minmax(90px, max-content) minmax(200px, 1fr);
+  grid-template-columns: minmax(90px, max-content) minmax(200px, 1fr) max-content;
   align-items: center;
   gap: 6px;
   margin-bottom: 2px;
@@ -954,6 +955,71 @@ body {
   gap: 18px;
   justify-content: center;
   min-width: 0;
+}
+
+.runner-strict-wrap {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.strict-harvest-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.strict-harvest-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.strict-harvest-pill {
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgb(184 255 90 / 0.36);
+  background: rgb(8 12 10 / 0.95);
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.strict-harvest-pill::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgb(184 255 90 / 0.88);
+  box-shadow: 0 0 6px rgb(184 255 90 / 0.42);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.strict-harvest-toggle input:checked + .strict-harvest-pill {
+  border-color: rgb(255 149 0 / 0.62);
+  background: rgb(20 10 3 / 0.95);
+  box-shadow: inset 0 0 8px rgb(255 149 0 / 0.18);
+}
+
+.strict-harvest-toggle input:checked + .strict-harvest-pill::after {
+  transform: translateX(14px);
+  background: rgb(255 149 0 / 0.95);
+  box-shadow: 0 0 6px rgb(255 149 0 / 0.42);
+}
+
+.strict-harvest-label {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .runner-key-stack {
@@ -1146,6 +1212,94 @@ body {
   flex-shrink: 0;
   margin-top: 4px;
   display: block;
+}
+
+.strict-suggest-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 2147483646;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.64));
+  backdrop-filter: blur(4px) saturate(0.85);
+  -webkit-backdrop-filter: blur(4px) saturate(0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(18px, 3vw, 30px);
+}
+
+.strict-suggest-modal--stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.strict-suggest-card {
+  width: min(620px, 94vw);
+  border: 1px solid rgb(184 255 90 / 0.52);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgb(10 16 13 / 0.98), rgb(6 10 8 / 0.99));
+  box-shadow:
+    0 24px 56px rgb(0 0 0 / 0.72),
+    0 0 24px rgb(184 255 90 / 0.26),
+    inset 0 0 0 1px rgb(184 255 90 / 0.2),
+    inset 0 0 26px rgb(184 255 90 / 0.08);
+  padding: 16px 18px;
+}
+
+.strict-suggest-title {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 0 16px rgb(184 255 90 / 0.28);
+}
+
+.strict-suggest-text {
+  margin: 0;
+  color: #b8ff5a;
+  font-size: 0.67rem;
+  line-height: 1.5;
+}
+
+.strict-suggest-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.strict-suggest-btn {
+  appearance: none;
+  border: 1px solid rgb(184 255 90 / 0.35);
+  border-radius: 7px;
+  background: rgb(8 10 9 / 0.96);
+  color: #b8ff5a;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(184 255 90 / 0.08);
+}
+
+.strict-suggest-btn:hover {
+  border-color: rgb(184 255 90 / 0.62);
+  box-shadow: 0 0 14px rgb(184 255 90 / 0.24), inset 0 0 0 1px rgb(184 255 90 / 0.14);
+}
+
+.strict-suggest-btn--primary {
+  border-color: rgb(255 149 0 / 0.62);
+  color: rgb(255 149 0);
+}
+
+.strict-suggest-btn--primary:hover {
+  border-color: rgb(255 149 0 / 0.9);
+  box-shadow: 0 0 10px rgb(255 149 0 / 0.2);
 }
 
 .docs-view {
@@ -1440,6 +1594,11 @@ body {
     order: 2;
     justify-content: flex-start;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runner-strict-wrap {
+    order: 3;
+    justify-content: flex-start;
   }
 
   .runner-key-caption {
