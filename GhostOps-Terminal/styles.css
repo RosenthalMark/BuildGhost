@@ -1313,6 +1313,8 @@ body {
   --key-face: #0e1012;
   --key-shadow: #030405;
   --key-highlight: #2b3134;
+  --launch-neon-rgb: 184 255 90;
+  --launch-neon: rgb(var(--launch-neon-rgb));
   appearance: none;
   border: none;
   padding: 0;
@@ -1350,7 +1352,7 @@ body {
   box-shadow:
     0 1px 0 rgb(255 255 255 / 0.08),
     inset 0 1px 2px rgb(0 0 0 / 0.9),
-    0 10px 24px rgb(91 255 118 / 0.24);
+    0 10px 24px rgb(var(--launch-neon-rgb) / 0.24);
 }
 
 .launch-key-label-root {
@@ -1397,38 +1399,54 @@ body {
 }
 
 .launch-key-label-root.launch-key-label--neon .launch-ch {
-  color: var(--accent-primary);
+  color: var(--launch-neon);
   animation: launchNeonGlow 2.6s ease-in-out 1;
 }
 
 .launch-spacebar-key:hover .launch-key-label-root .launch-ch,
 .launch-spacebar-key:focus-visible .launch-key-label-root .launch-ch {
-  color: var(--accent-primary);
+  color: var(--launch-neon);
   text-shadow:
-    0 0 6px rgb(184 255 90 / 0.9),
-    0 0 16px rgb(184 255 90 / 0.45);
+    0 0 6px rgb(var(--launch-neon-rgb) / 0.9),
+    0 0 16px rgb(var(--launch-neon-rgb) / 0.45);
 }
 
 @keyframes launchNeonGlow {
   0%,
   100% {
-    text-shadow: 0 0 2px rgb(184 255 90 / 0.5);
+    text-shadow: 0 0 2px rgb(var(--launch-neon-rgb) / 0.5);
     filter: brightness(1);
   }
 
   40% {
     text-shadow:
-      0 0 10px rgb(184 255 90 / 0.95),
-      0 0 20px rgb(184 255 90 / 0.45);
+      0 0 10px rgb(var(--launch-neon-rgb) / 0.95),
+      0 0 20px rgb(var(--launch-neon-rgb) / 0.45);
     filter: brightness(1.35);
   }
 
   70% {
     text-shadow:
-      0 0 6px rgb(184 255 90 / 0.8),
-      0 0 14px rgb(184 255 90 / 0.35);
+      0 0 6px rgb(var(--launch-neon-rgb) / 0.8),
+      0 0 14px rgb(var(--launch-neon-rgb) / 0.35);
     filter: brightness(1.15);
   }
+}
+
+.harvest-spacebar-key {
+  --launch-neon-rgb: 255 149 0;
+  min-width: clamp(180px, 22vw, 250px);
+}
+
+.webview-nav-bar .harvest-spacebar-key .launch-key-bezel {
+  padding: 3px 4px;
+}
+
+.webview-nav-bar .harvest-spacebar-key .launch-key-label-root {
+  min-height: 28px;
+  padding: 4px 12px;
+  font-size: 0.56rem;
+  letter-spacing: 0.09em;
 }
 
 @media (max-width: 1300px) {

@@ -211,7 +211,16 @@
               <button id="wv-forward" class="wv-nav-btn" type="button" aria-label="Go forward" title="Forward">&#8594;</button>
               <button id="wv-reload" class="wv-nav-btn" type="button" aria-label="Reload page" title="Reload">&#8635;</button>
               <span id="wv-current-url" class="wv-current-url"></span>
-              <button id="start-harvest-btn" class="wv-harvest-btn" type="button" aria-label="Start Harvest">[ START HARVEST ]</button>
+              <button
+                id="start-harvest-btn"
+                class="launch-spacebar-key harvest-spacebar-key"
+                type="button"
+                aria-label="Start Harvest"
+              >
+                <span class="launch-key-bezel">
+                  <span class="launch-key-label-root" aria-hidden="true"></span>
+                </span>
+              </button>
             </nav>
             <webview
               id="scrape-webview"

@@ -32,6 +32,7 @@ const NixieTicker = (function () {
   let spinTimer = null
   let isActive = false
   let bootTimers = []
+  let lastRenderedBaseMessage = ''
 
   function clearBootTimers() {
     bootTimers.forEach((id) => clearTimeout(id))
@@ -52,8 +53,12 @@ const NixieTicker = (function () {
   function setText(msg, speedPxPerSec) {
     const t = textEl()
     if (!t) return
+    const base = String(msg || '').trim()
+    if (!base) return
+    if (base === lastRenderedBaseMessage) return
+    lastRenderedBaseMessage = base
     const px = speedPxPerSec || 76
-    const single = `> ${String(msg || '').trim()}_`
+    const single = `> ${base}_`
     const marquee = `${single}${MARQUEE_GAP_TEXT}${single}`
     t.textContent = marquee
     const laneW = t.parentElement ? t.parentElement.clientWidth : 420
@@ -101,7 +106,6 @@ const NixieTicker = (function () {
 
   function scan(_pass, _total) {
     if (!isActive) return
-    setText('HARVEST IN PROGRESS', 80)
   }
 
   function querying() {
@@ -121,6 +125,7 @@ const NixieTicker = (function () {
     isActive = false
     stopSpin()
     setMode(null)
+    lastRenderedBaseMessage = ''
     setText(msg, speedPxPerSec)
   }
 
@@ -195,7 +200,17 @@ const toolCache = new Map()
 let selectorCaptureBridgeBound = false
 let lastCaptureFingerprint = ''
 let lastCaptureAt = 0
-let launchKeyAnimGen = 0
+const launchKeyAnimGenByButton = new WeakMap()
+
+function bumpLaunchKeyGen(button) {
+  const next = (launchKeyAnimGenByButton.get(button) || 0) + 1
+  launchKeyAnimGenByButton.set(button, next)
+  return next
+}
+
+function getLaunchKeyGen(button) {
+  return launchKeyAnimGenByButton.get(button) || 0
+}
 const spoolerDependencyState = {
   checked: false,
   healthy: false,
@@ -240,7 +255,7 @@ function bindModuleDockToggle() {
 }
 
 function setLaunchKeyStaticLabel(button, label) {
-  launchKeyAnimGen += 1
+  bumpLaunchKeyGen(button)
   const root = button?.querySelector('.launch-key-label-root')
   if (!root) return
   root.textContent = label
@@ -252,8 +267,7 @@ function initLaunchSpacebarKey(button, options = {}) {
   const root = button?.querySelector('.launch-key-label-root')
   if (!root) return
 
-  launchKeyAnimGen += 1
-  const gen = launchKeyAnimGen
+  const gen = bumpLaunchKeyGen(button)
   root.textContent = ''
   root.classList.remove('launch-key-label--neon')
 
@@ -270,7 +284,7 @@ function initLaunchSpacebarKey(button, options = {}) {
   let greenTimer = null
   let cycleTimer = null
 
-  const isStale = () => gen !== launchKeyAnimGen
+  const isStale = () => gen !== getLaunchKeyGen(button)
 
   function clearTimers() {
     if (greenTimer) {
@@ -1110,9 +1124,12 @@ const ALL_NODE_SELECTORS = [
   '[role="checkbox"]', '[role="radio"]', '[role="switch"]', '[role="combobox"]', '[role="option"]',
   '[onclick]', '[tabindex]:not([tabindex="-1"])',
   'img', 'video', 'canvas', 'svg', 'iframe',
-  'h1', 'h2', 'h3', 'h4',
+  'h1', 'h2', 'h3', 'h4', 'p', 'li', 'figcaption', 'label', 'summary',
   'section[id]', 'article[id]', 'aside[id]', 'header[id]', 'footer[id]', 'main[id]', 'nav[id]',
   'div[id]', 'ul[id]', 'ol[id]', 'span[id]',
+  '[class*="title" i]', '[class*="tag" i]', '[class*="badge" i]', '[class*="chip" i]', '[class*="label" i]', '[class*="heading" i]',
+  '[class*="metric" i]', '[class*="kpi" i]', '[class*="stat" i]', '[class*="value" i]', '[class*="number" i]',
+  '[class*="description" i]', '[class*="desc" i]', '[class*="summary" i]', '[class*="subtitle" i]', '[class*="caption" i]',
   '[data-testid]', '[data-test]', '[data-cy]', '[data-qa]',
 ].join(',')
 
@@ -1149,15 +1166,37 @@ const HARVEST_NODE_SCRIPT = `
 
   function buildPatternSignature(el) {
     var tag = el.tagName.toLowerCase();
-    var cls = Array.from(el.classList).filter(function(c) { return c.length > 2; }).sort().join('.');
+    var cls = Array.from(el.classList)
+      .map(function(c) { return c.toLowerCase(); })
+      .filter(function(c) {
+        if (c.length <= 2) return false;
+        // Drop highly-unique generated classes that explode grouping.
+        if (/[0-9]{3,}/.test(c)) return false;
+        if (c.length > 28) return false;
+        return true;
+      })
+      .slice(0, 4)
+      .sort()
+      .join('.');
     var pTag = el.parentElement ? el.parentElement.tagName.toLowerCase() : '';
-    var pCls = el.parentElement ? Array.from(el.parentElement.classList).filter(function(c) { return c.length > 2; }).sort().join('.') : '';
+    var pCls = el.parentElement
+      ? Array.from(el.parentElement.classList)
+          .map(function(c) { return c.toLowerCase(); })
+          .filter(function(c) {
+            if (c.length <= 2) return false;
+            if (/[0-9]{3,}/.test(c)) return false;
+            if (c.length > 28) return false;
+            return true;
+          })
+          .slice(0, 4)
+          .sort()
+          .join('.')
+      : '';
     var sibCount = el.parentElement
       ? Array.from(el.parentElement.children).filter(function(s) { return s.tagName === el.tagName; }).length
       : 1;
-    var identity = (el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('action') || '').trim().slice(0, 80);
-    var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.textContent || '').trim().slice(0, 60);
-    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount + '|' + identity + '|' + text;
+    // Structural signature only: one master per repeated UI pattern.
+    return tag + '[' + cls + ']<' + pTag + '[' + pCls + ']|x' + sibCount;
   }
 
   function getLabel(el) {
@@ -1212,6 +1251,21 @@ const HARVEST_NODE_SCRIPT = `
     return [tag, role, id, stableData, href, src, action, name, type, normLabel, rectSig].join('|');
   }
 
+  function buildClassTokens(el) {
+    function tokenize(element) {
+      return Array.from(element.classList || [])
+        .map(function(c) { return c.toLowerCase(); })
+        .flatMap(function(c) { return c.split(/[-_]+/); })
+        .filter(function(t) { return t && t.length >= 2; });
+    }
+    var own = tokenize(el);
+    var p1 = el.parentElement ? tokenize(el.parentElement) : [];
+    var p2 = (el.parentElement && el.parentElement.parentElement)
+      ? tokenize(el.parentElement.parentElement)
+      : [];
+    return Array.from(new Set(own.concat(p1).concat(p2))).slice(0, 30);
+  }
+
   function nodeType(el) {
     var tag = el.tagName.toLowerCase();
     if (tag === 'a') return 'link';
@@ -1260,6 +1314,7 @@ const HARVEST_NODE_SCRIPT = `
         type: nodeType(el),
         selector: sel,
         label: label,
+        classTokens: buildClassTokens(el),
         patternSig: buildPatternSignature(el),
         rect: {
           x: Math.round(rect.x + scrollLeft),
@@ -1293,6 +1348,26 @@ function scoreNodeConfidence(selector) {
 function extractNamespace(selector) {
   if (!selector) return null
   const parts = selector.split(' > ')
+
+  const GENERIC_TOKENS = new Set([
+    'div', 'span', 'ul', 'li', 'section', 'article', 'wrapper',
+    'container', 'inner', 'outer', 'row', 'col', 'grid', 'box',
+    'wrap', 'item', 'list', 'content', 'body', 'root', 'el', 'block',
+  ])
+
+  // Prefer the direct parent segment's meaningful class to avoid
+  // collapsing all descendants into a distant ancestor ID namespace.
+  if (parts.length >= 2) {
+    const parentPart = parts[parts.length - 2]
+    const parentClasses = (parentPart.match(/\.[a-zA-Z0-9_-]+/g) || []).map((c) => c.slice(1))
+    for (const cls of parentClasses) {
+      const tokens = cls.toLowerCase().split(/[-_]+/)
+      if (!tokens.every((t) => GENERIC_TOKENS.has(t) || t.length <= 2)) {
+        return cls.toLowerCase()
+      }
+    }
+  }
+
   for (let i = parts.length - 2; i >= 0; i--) {
     const m = parts[i].match(/#([a-zA-Z][\w-]*)/)
     if (m) {
@@ -1310,9 +1385,39 @@ function extractNamespace(selector) {
   return null
 }
 
-function semanticSuffix(node) {
+function extractSelectorClassTokens(selector) {
+  if (!selector) return []
+  const parts = selector.split(' > ')
+  const allClassMatches = parts.flatMap((part) =>
+    (part.match(/\.[a-zA-Z0-9_-]+/g) || []).map((c) => c.slice(1).toLowerCase())
+  )
+  return Array.from(
+    new Set(
+      allClassMatches
+        .flatMap((c) => c.split(/[-_]+/))
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2)
+    )
+  )
+}
+
+function semanticSuffix(node, selector = '') {
   const type = node.type
   const label = (node.label || '').toLowerCase()
+  const nodeTokens = Array.isArray(node.classTokens) ? node.classTokens : []
+  const selectorTokens = extractSelectorClassTokens(selector)
+  const tokens = Array.from(new Set([...nodeTokens, ...selectorTokens]))
+  const has = (token) => tokens.includes(token)
+  const hasAny = (arr) => arr.some((t) => has(t))
+  if (hasAny(['title', 'heading', 'headline', 'name', 'header'])) return 'title'
+  if (hasAny(['metric', 'kpi', 'stat', 'value', 'number', 'count', 'percent', 'score'])) return 'metric'
+  if (hasAny(['caption', 'label'])) return 'label'
+  if (hasAny(['subtitle', 'subhead', 'description', 'desc', 'excerpt', 'summary', 'body', 'text', 'copy'])) return 'subtitle'
+  if (hasAny(['tag', 'tags', 'chip', 'badge', 'pill', 'category', 'skill', 'tech'])) return 'tag'
+  if (hasAny(['img', 'image', 'photo', 'thumb', 'thumbnail', 'avatar', 'cover', 'poster'])) return 'img'
+  if (hasAny(['cta', 'action', 'primary'])) return 'cta-btn'
+  if (hasAny(['author', 'meta', 'byline', 'date', 'time', 'timestamp'])) return 'meta'
+  if (/^\s*(\d+([.,]\d+)?\s*(%|x|yrs?|years?)?)\s*$/.test(label)) return 'metric'
   const isPlayLike = /(^|\b)(play|watch|video)(\b|$)/i.test(label)
   if (isPlayLike && (type === 'button' || type === 'link' || type === 'svg' || type.startsWith('role[button') || type === 'div')) return 'play-btn'
   if (type === 'link') return 'link'
@@ -1349,56 +1454,86 @@ function semanticSuffix(node) {
 
 function deriveLogicalName(node) {
   const sel = node.selector || ''
+  let name
 
-  if (sel.startsWith('#')) {
+  // Only treat this as an element-level ID shortcut when the selector is
+  // exactly an ID selector, not a descendant path rooted at an ancestor ID.
+  if (/^#[a-zA-Z][\w-]*$/.test(sel)) {
     const idMatch = sel.match(/^#([a-zA-Z][\w-]*)/)
     if (idMatch) {
       const base = idMatch[1]
         .replace(/([a-z])([A-Z])/g, '$1-$2')
         .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
         .toLowerCase()
-      const suffix = semanticSuffix(node)
+      const suffix = semanticSuffix(node, sel)
       if (suffix.endsWith('-container') || suffix === 'nav-container' || suffix === 'header-bar' || suffix === 'footer-bar' || suffix === 'main-container') {
-        return `${base}-container`
+        name = `${base}-container`
+      } else if (/(^|-)btn$/.test(suffix) && !base.endsWith(`-${suffix}`)) {
+        name = `${base}-${suffix}`
+      } else {
+        name = base
       }
-      if (/(^|-)btn$/.test(suffix) && !base.endsWith(`-${suffix}`)) {
-        return `${base}-${suffix}`
-      }
-      return base
     }
   }
 
-  const namespace = extractNamespace(sel)
-  const suffix = semanticSuffix(node)
+  if (!name) {
+    const namespace = extractNamespace(sel)
+    const suffix = semanticSuffix(node, sel)
 
-  if (namespace) return `${namespace}-${suffix}`
+    if (namespace) {
+      name = `${namespace}-${suffix}`
+    } else {
+      const raw = (node.label || node.type)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim()
+        .split(/\s+/)
+        .slice(0, 3)
+        .join('-')
 
-  const raw = (node.label || node.type)
+      name = raw ? `${raw}-${suffix}` : `node-${node.index}-${suffix}`
+    }
+  }
+
+  // Only append an index for non-first siblings; masters stay clean.
+  if (node.groupSize > 1 && node.groupPosition != null && node.groupPosition > 0) {
+    name = `${name}-${node.groupPosition + 1}`
+  }
+
+  return name
+}
+
+function deriveGroupKey(node) {
+  const selector = node.selector || ''
+  const namespace = extractNamespace(selector) || 'global'
+  const suffix = semanticSuffix(node, selector)
+  const baseType = (node.type || '')
+    .replace(/\[.*?\]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
     .trim()
-    .split(/\s+/)
-    .slice(0, 3)
-    .join('-')
-
-  return raw ? `${raw}-${suffix}` : `node-${node.index}-${suffix}`
+  const rect = node.rect || {}
+  const w = Math.max(1, Number(rect.width) || 1)
+  const h = Math.max(1, Number(rect.height) || 1)
+  const sizeBucket = `${Math.max(1, Math.round(w / 120))}x${Math.max(1, Math.round(h / 48))}`
+  return [namespace, suffix, baseType, sizeBucket].join('|')
 }
 
 function applyPatternGroups(nodes) {
   const groups = new Map()
   nodes.forEach((node) => {
-    const sig = node.patternSig || node.selector
+    const sig = deriveGroupKey(node)
     if (!groups.has(sig)) groups.set(sig, [])
     groups.get(sig).push(node)
   })
 
   nodes.forEach((node) => {
-    const group = groups.get(node.patternSig || node.selector)
-    const alwaysMaster = group.length <= 3
-    const isMaster = alwaysMaster || group[0].index === node.index
+    const group = groups.get(deriveGroupKey(node))
+    const isMaster = group[0].index === node.index
     node.isMaster = isMaster
     node.isGhost = !isMaster
     node.collectionCount = group.length
+    node.groupPosition = group.indexOf(node)
+    node.groupSize = group.length
   })
 
   return nodes
@@ -1431,6 +1566,45 @@ async function deepScrollPage(webview) {
   return { pageHeight, steps }
 }
 
+function mergeHarvestPasses(passes) {
+  const byKey = new Map()
+  passes.forEach((nodes) => {
+    if (!Array.isArray(nodes)) return
+    nodes.forEach((node) => {
+      const rect = node?.rect || {}
+      const key = [
+        node?.selector || '',
+        node?.type || '',
+        (node?.label || '').trim().toLowerCase(),
+        Number(rect.x || 0),
+        Number(rect.y || 0),
+        Number(rect.width || 0),
+        Number(rect.height || 0),
+      ].join('|')
+      if (!byKey.has(key)) byKey.set(key, node)
+    })
+  })
+  return Array.from(byKey.values()).map((node, index) => ({ ...node, index }))
+}
+
+async function runHarvestPass(webview, passLabel) {
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] DOM query pass ${passLabel}...`)
+  let raw = []
+  try {
+    raw = await webview.executeJavaScript(HARVEST_NODE_SCRIPT, true)
+  } catch (err) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] pass ${passLabel} script error: ${err.message}`)
+    return []
+  }
+  if (!Array.isArray(raw)) return []
+  if (raw[0]?.error) {
+    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] pass ${passLabel} DOM error: ${raw[0].error}`)
+    return []
+  }
+  appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] pass ${passLabel} captured ${raw.length} raw nodes`)
+  return raw
+}
+
 async function harvestInteractiveNodes(webview) {
   const url = typeof webview.getURL === 'function' ? webview.getURL() : ''
   if (!url || url === 'about:blank') {
@@ -1449,32 +1623,24 @@ async function harvestInteractiveNodes(webview) {
   }
 
   appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] querying all visible nodes...`)
-
-  let rawNodes = []
-  try {
-    rawNodes = await webview.executeJavaScript(HARVEST_NODE_SCRIPT, true)
-  } catch (err) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] script error: ${err.message}`)
-    return
-  }
+  const pass1 = await runHarvestPass(webview, '1/2')
+  await new Promise((r) => setTimeout(r, 450))
+  const pass2 = await runHarvestPass(webview, '2/2')
+  const rawNodes = mergeHarvestPasses([pass1, pass2])
 
   if (!Array.isArray(rawNodes) || rawNodes.length === 0) {
     appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] no nodes found`)
     return
   }
 
-  if (rawNodes[0]?.error) {
-    appendTerminalLine(`[${isoStamp()}] [scrapetag:harvest] DOM error: ${rawNodes[0].error}`)
-    return
-  }
-
-  const enriched = rawNodes.map((node) => ({
+  const withGroups = applyPatternGroups(rawNodes.map((node) => ({
     ...node,
     confidence: scoreNodeConfidence(node.selector),
+  })))
+  const nodes = withGroups.map((node) => ({
+    ...node,
     logicalName: deriveLogicalName(node),
   }))
-
-  const nodes = applyPatternGroups(enriched)
   lastHarvestNodes = nodes
 
   const masters = nodes.filter((n) => n.isMaster)
@@ -1990,6 +2156,7 @@ function renderRunnerState(toolName, toolInfo) {
     }
 
     if (harvestBtn) {
+      initLaunchSpacebarKey(harvestBtn, { label: 'START HARVEST', enableCycle: true })
       harvestBtn.addEventListener('click', () => {
         const wv = document.getElementById('scrape-webview')
         if (wv) harvestInteractiveNodes(wv)
