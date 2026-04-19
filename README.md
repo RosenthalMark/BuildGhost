@@ -46,6 +46,18 @@ ghostops status
 
 ---
 
+### VERSIONING + CHANGELOG
+
+- `VERSION` at repo root is the current release baseline (`MAJOR.MINOR.PATCH`).
+- `CHANGELOG.md` at repo root is the canonical release history.
+- Bump rules:
+  - `MAJOR`: huge update affecting broad system behavior.
+  - `MINOR`: scoped feature-area update.
+  - `PATCH`: hotfix, spelling/typo, or small correction.
+- Every merge that changes behavior should update `CHANGELOG.md`; version bumps should update both `VERSION` and `CHANGELOG.md` in the same change.
+
+---
+
 ### THE PROBLEM
 Modern software delivery is crippled by **brittle automation** and **reactive quality gates**. Traditional QA suites rely on static selectors and manual oversight, leading to high maintenance costs, flaky pipelines, and a lack of confidence at the moment of deployment. As systems scale, the "Test Debt" eventually outpaces feature development.
 
