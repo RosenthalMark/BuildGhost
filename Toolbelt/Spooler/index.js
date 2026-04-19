@@ -2,7 +2,7 @@
 
 const path = require('path')
 const fs = require('fs')
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..')
 const SPOOLER_APP_DIR = path.join(REPO_ROOT, 'Toolbelt', 'Spooler')
@@ -11,7 +11,22 @@ const SPOOLER_PORT = process.env.SPOOLER_PORT || '8512'
 const SPOOLER_URL = `http://127.0.0.1:${SPOOLER_PORT}`
 
 function resolveSpoolerPython() {
-  return fs.existsSync(SPOOLER_VENV_PYTHON) ? SPOOLER_VENV_PYTHON : 'python3'
+  const candidates = [
+    SPOOLER_VENV_PYTHON,
+    process.env.PYTHON3_BIN,
+    process.env.PYTHON_BIN,
+    'python3',
+    'python'
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    const isPathLike = candidate.includes(path.sep)
+    if (isPathLike && !fs.existsSync(candidate)) continue
+    const probe = spawnSync(candidate, ['-V'], { stdio: 'ignore' })
+    if (!probe.error) return candidate
+  }
+
+  return 'python3'
 }
 
 function run() {

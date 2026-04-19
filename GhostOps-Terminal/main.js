@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 
 const TOOL_ROOT = path.join(__dirname, '..', 'Toolbelt')
 const SPOOLER_APP_ROOT = path.join(TOOL_ROOT, 'Spooler')
@@ -39,7 +39,22 @@ function toolEntryPath(toolName) {
 }
 
 function resolveSpoolerPython() {
-  return fs.existsSync(SPOOLER_VENV_PYTHON) ? SPOOLER_VENV_PYTHON : 'python3'
+  const candidates = [
+    SPOOLER_VENV_PYTHON,
+    process.env.PYTHON3_BIN,
+    process.env.PYTHON_BIN,
+    'python3',
+    'python'
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    const isPathLike = candidate.includes(path.sep)
+    if (isPathLike && !fs.existsSync(candidate)) continue
+    const probe = spawnSync(candidate, ['-V'], { stdio: 'ignore' })
+    if (!probe.error) return candidate
+  }
+
+  return 'python3'
 }
 
 function runCapture(command, args, options = {}) {
