@@ -15,3 +15,10 @@ The format is based on Keep a Changelog principles and uses semantic versioning.
 - Harvest capture deduplication strengthened with a deterministic identity key before grouping.
 - Harvest visibility checks refined to improve captured-element completeness while filtering hidden/non-rendered structural tags.
 - Runtime launch/dependency checks hardened with interpreter fallback resolution (`venv`, env overrides, `python3`, `python`).
+## [Unreleased]
+
+### Fixed
+- Spooler harness now reattaches correctly when returning to the module in-session instead of appearing inactive.
+- Spooler webview retry flow no longer cancels reconnect attempts during initial Streamlit startup race conditions.
+- Module intro videos now play once per app session per module (no repeat on module switch within same session).
+

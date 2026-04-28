@@ -32,10 +32,17 @@ const DEFAULT_BOOT_CONFIG = Object.freeze({
 const SKIP_BOOT_KEY = 'ghostops_skip_boot_sequences'
 const moduleBootCounts = JSON.parse(localStorage.getItem('ghostops_boot_counts') || '{}')
 const NUDGE_DELAY_MS = 5000
+const sessionBootSeen = new Set()
 
 export function playBootSequence(toolName, stageContent, onComplete) {
   const skipBoot = localStorage.getItem(SKIP_BOOT_KEY) === '1'
   const config = moduleBootConfig[toolName] || DEFAULT_BOOT_CONFIG
+  const sessionKey = String(toolName || 'default')
+
+  if (sessionBootSeen.has(sessionKey)) {
+    onComplete()
+    return
+  }
 
   if (skipBoot) {
     onComplete()
@@ -72,10 +79,12 @@ export function playBootSequence(toolName, stageContent, onComplete) {
   overlay.appendChild(overlayHint)
 
   vid.addEventListener('ended', () => {
+    sessionBootSeen.add(sessionKey)
     onComplete()
   })
 
   vid.addEventListener('error', () => {
+    sessionBootSeen.add(sessionKey)
     onComplete()
   })
 
@@ -89,7 +98,10 @@ export function playBootSequence(toolName, stageContent, onComplete) {
     nudge.style.cssText = `position:absolute;bottom:12px;right:12px;z-index:4;background:transparent;border:1px solid ${config.color};color:${config.color};font-family:"Share Tech Mono",monospace;font-size:0.62rem;letter-spacing:0.08em;padding:4px 10px;border-radius:4px;cursor:pointer;opacity:0.6;transition:opacity 0.2s;`
     nudge.addEventListener('mouseenter', () => { nudge.style.opacity = '1' })
     nudge.addEventListener('mouseleave', () => { nudge.style.opacity = '0.6' })
-    nudge.addEventListener('click', () => { onComplete() })
+    nudge.addEventListener('click', () => {
+      sessionBootSeen.add(sessionKey)
+      onComplete()
+    })
     wrap.appendChild(nudge)
   }, NUDGE_DELAY_MS) : null
 

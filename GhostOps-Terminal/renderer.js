@@ -2078,6 +2078,8 @@ async function launchEnvHarness(toolInfo = null, { auto = false } = {}) {
   }
 
   if (spoolerHarnessActive && spoolerWebview.src === SPOOLER_UI_URL) {
+    spoolerShellMounted.hidden = false
+    appendTerminalLine(`[${isoStamp()}] [Spooler] harness already active — reattaching stage view`)
     return
   }
 
@@ -2303,10 +2305,16 @@ function renderRunnerState(toolName, toolInfo) {
           appendTerminalLine(`[${isoStamp()}] [Spooler] webview loading started`)
         })
         spoolerWebview.addEventListener('did-stop-loading', () => {
+          appendTerminalLine(`[${isoStamp()}] [Spooler] webview loading complete`)
+        })
+        spoolerWebview.addEventListener('did-finish-load', () => {
+          const currentUrl = typeof spoolerWebview.getURL === 'function' ? spoolerWebview.getURL() : ''
+          if (!currentUrl || !currentUrl.startsWith(SPOOLER_UI_URL)) {
+            return
+          }
           clearSpoolerWebviewRetry()
           spoolerWebviewRetryCount = 0
           spoolerHarnessActive = true
-          appendTerminalLine(`[${isoStamp()}] [Spooler] webview loading complete`)
           updateNixieReadout('SPOOLER UI ONLINE :: BIG-SCREEN LINKED')
         })
         spoolerWebview.addEventListener('did-fail-load', (event) => {
