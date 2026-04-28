@@ -32,7 +32,7 @@ while IFS= read -r f; do
   [[ "$f" == "VERSION" ]] && has_version=1
 
   case "$f" in
-    CHANGELOG.md|VERSION|README.md|ROADMAP.md|LICENSE|CONTRIBUTING.md|ARCHITECTURE.md|MASTER_CONTEXT.txt|Docs/*|.gitignore|.gitattributes)
+    CHANGELOG.md|VERSION|README.md|ROADMAP.md|LICENSE|CONTRIBUTING.md|ARCHITECTURE.md|MASTER_CONTEXT.txt|Docs/*|docs/*|.githooks/*|.gitignore|.gitattributes)
       ;;
     *)
       requires_changelog=1
