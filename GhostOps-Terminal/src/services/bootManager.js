@@ -17,6 +17,10 @@ const moduleBootConfig = {
   Spooler: {
     video: 'assets/core/GHOSTops-startup-sequence.mp4',
     color: '#b8ff5a'
+  },
+  Trace: {
+    video: 'assets/modules/trace/trace-boot.mp4',
+    color: '#9cf7ff'
   }
 }
 

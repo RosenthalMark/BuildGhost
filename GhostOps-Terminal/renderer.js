@@ -522,6 +522,11 @@ const toolConfig = {
     preview: 'assets/core/GHOSTops-terminal-logo-2.png',
     description: 'SPOOLER harness is not present. Initialize to scaffold the reproducible hostile-environment runtime bridge.',
     expectedPath: '../Toolbelt/Spooler/index.js'
+  },
+  Trace: {
+    preview: '../Toolbelt/Trace/assets/trace_logo.png',
+    description: 'Trace module was not discovered in Toolbelt. Initialize to scaffold deterministic state snapshots and replay contracts.',
+    expectedPath: '../Toolbelt/Trace/index.js'
   }
 }
 
