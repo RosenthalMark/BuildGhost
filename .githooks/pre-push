@@ -49,10 +49,38 @@ fi
 if [[ $requires_changelog -eq 1 && $has_changelog -eq 0 ]]; then
   echo "[buildghost-guard] Behavior/code files changed without CHANGELOG.md update."
   echo "[buildghost-guard] Append to the existing CHANGELOG.md (do not create a new changelog file)."
-  echo "[buildghost-guard] If this truly needs no changelog entry, push with ALLOW_NO_CHANGELOG=1."
-  if [[ "${ALLOW_NO_CHANGELOG:-0}" != "1" ]]; then
-    exit 1
+  if [[ "${ALLOW_NO_CHANGELOG:-0}" == "1" ]]; then
+    exit 0
   fi
+
+  read -r -p "[buildghost-guard] Add a CHANGELOG.md template now? (Y/n): " add_now < /dev/tty || exit 1
+  case "${add_now:-Y}" in
+    n|N|no|NO)
+      echo "[buildghost-guard] Push canceled. Re-run with ALLOW_NO_CHANGELOG=1 only for true exceptions."
+      exit 1
+      ;;
+    *)
+      if ! grep -q "^## \[Unreleased\]" CHANGELOG.md 2>/dev/null; then
+        {
+          echo ""
+          echo "## [Unreleased]"
+          echo ""
+          echo "### Changed"
+          echo "- TODO: describe behavior updates in this branch."
+          echo ""
+        } >> CHANGELOG.md
+      else
+        {
+          echo ""
+          echo "### Changed"
+          echo "- TODO: describe behavior updates in this branch."
+          echo ""
+        } >> CHANGELOG.md
+      fi
+      echo "[buildghost-guard] Added CHANGELOG template. Stage + commit CHANGELOG.md, then push again."
+      exit 1
+      ;;
+  esac
 fi
 
 exit 0
