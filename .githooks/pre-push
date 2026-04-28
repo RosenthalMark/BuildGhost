@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT"
+
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+if [[ "$CURRENT_BRANCH" == "main" ]]; then
+  echo "[buildghost-guard] Direct pushes to 'main' are blocked for this repo."
+  echo "[buildghost-guard] Create/use a feature branch and open a PR."
+  exit 1
+fi
+
+BASE_REF="origin/main"
+if ! git show-ref --verify --quiet "refs/remotes/$BASE_REF"; then
+  # If origin/main is unavailable locally, skip changelog guard to avoid false blocks.
+  exit 0
+fi
+
+CHANGED_FILES="$(git diff --name-only "$BASE_REF...HEAD")"
+if [[ -z "$CHANGED_FILES" ]]; then
+  exit 0
+fi
+
+has_changelog=0
+has_version=0
+requires_changelog=0
+
+while IFS= read -r f; do
+  [[ "$f" == "CHANGELOG.md" ]] && has_changelog=1
+  [[ "$f" == "VERSION" ]] && has_version=1
+
+  case "$f" in
+    CHANGELOG.md|VERSION|README.md|ROADMAP.md|LICENSE|CONTRIBUTING.md|ARCHITECTURE.md|MASTER_CONTEXT.txt|Docs/*|.gitignore|.gitattributes)
+      ;;
+    *)
+      requires_changelog=1
+      ;;
+  esac
+done <<< "$CHANGED_FILES"
+
+if [[ $has_version -eq 1 && $has_changelog -eq 0 ]]; then
+  echo "[buildghost-guard] VERSION changed without CHANGELOG.md update."
+  echo "[buildghost-guard] Per repo policy, bumping version requires CHANGELOG.md in the same PR."
+  exit 1
+fi
+
+if [[ $requires_changelog -eq 1 && $has_changelog -eq 0 ]]; then
+  echo "[buildghost-guard] Behavior/code files changed without CHANGELOG.md update."
+  echo "[buildghost-guard] Append to the existing CHANGELOG.md (do not create a new changelog file)."
+  echo "[buildghost-guard] If this truly needs no changelog entry, push with ALLOW_NO_CHANGELOG=1."
+  if [[ "${ALLOW_NO_CHANGELOG:-0}" != "1" ]]; then
+    exit 1
+  fi
+fi
+
+exit 0
