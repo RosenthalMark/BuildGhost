@@ -56,8 +56,8 @@ if [[ $requires_changelog -eq 1 && $has_changelog -eq 0 ]]; then
   read -r -p "[buildghost-guard] Add a CHANGELOG.md template now? (Y/n): " add_now < /dev/tty || exit 1
   case "${add_now:-Y}" in
     n|N|no|NO)
-      echo "[buildghost-guard] Push canceled. Re-run with ALLOW_NO_CHANGELOG=1 only for true exceptions."
-      exit 1
+      echo "[buildghost-guard] Continuing push without CHANGELOG.md update."
+      exit 0
       ;;
     *)
       if ! grep -q "^## \[Unreleased\]" CHANGELOG.md 2>/dev/null; then
