@@ -1,13 +1,13 @@
-# Scrapetag
+# SCRAPEtag
 
-Manual selector hunting is dead. Scrapetag bridges the gap between legacy chaos and modern stability. It crawls your DOM, identifies interactive nodes, and performs safe, regex-strict injection of custom data-attributes, ensuring your automated suites are truly decoupled from UI churn.
+Manual selector hunting is dead. `SCRAPEtag` bridges the gap between legacy chaos and modern stability. It crawls the DOM, identifies interactive nodes, and performs safe, regex-strict injection of custom data attributes so automated suites are decoupled from UI churn.
 
 Intelligent DOM mapping helper: capture interactive elements, assign human-readable aliases, and emit CSS selectors for downstream automation.
 
 ## Two run modes
 
-1. **GHOSTops Terminal (recommended for demos)**  
-   Open `ghostops-terminal`, select **Scrapetag**, set **TARGET URL** (http/https; bare domains get `https://` prepended), then click **Launch In-App Scrape** or press **Enter** in the field. The last successful URL is stored in `localStorage` under `ghostops_scrape_target_url`. The embedded webview loads that site; click an element, enter an alias in the modal, then confirm. Captures appear in the selector HUD, Nixie ticker, and terminal log as `[CAPTURED] alias -> selector`.
+1. **GhostOps Terminal (recommended for demos)**  
+   Open `ghostops-terminal`, select **SCRAPEtag**, set **TARGET URL** (http/https; bare domains get `https://` prepended), then click **Launch In-App Scrape** or press **Enter** in the field. The last successful URL is stored in `localStorage` under `ghostops_scrape_target_url`. The embedded webview loads that site; click an element, enter an alias in the modal, then confirm. Captures appear in the selector HUD, Nixie ticker, and terminal log as `[CAPTURED] alias -> selector`.
 
 2. **Standalone Playwright**  
    From this directory:
@@ -32,12 +32,12 @@ Intelligent DOM mapping helper: capture interactive elements, assign human-reada
 
 ## Confidence scoring (green vs orange)
 
-Scrapetag assigns every harvested selector a confidence score from `0` to `100`, then colors the overlay:
+`SCRAPEtag` assigns every harvested selector a confidence score from `0` to `100`, then colors the overlay:
 
 - `green` when score is `>= 60`
 - `orange` when score is `< 60`
 
-This is not vibe-based; it is deterministic selector math from `scoreNodeConfidence()` in `GhostOps-Terminal/renderer.js`.
+This is not vibe-based; it is deterministic selector math from `scoreNodeConfidence()` in `ghostops-terminal/renderer.js`.
 
 ### Scoring formula
 

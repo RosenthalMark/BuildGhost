@@ -1,6 +1,6 @@
 # Trace
 
-Trace is the deterministic state engine module for payment funnels inside GHOSTops.
+Trace is the deterministic state engine module for payment funnels inside BuildGhost.
 
 ## Purpose
 - Capture immutable `StateSnapshot` records of transaction context.

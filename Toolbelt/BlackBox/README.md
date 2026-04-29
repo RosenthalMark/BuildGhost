@@ -1,7 +1,7 @@
-# BLACKbox
+# BlackBox
 
 ## Mission
-`BLACKbox` is the BuildGhost release-intelligence and migration module. Its job is to preserve test intent while modernizing automation stacks and reducing framework rewrite risk.
+`BlackBox` is the BuildGhost release-intelligence and migration module. Its job is to preserve test intent while modernizing automation stacks and reducing framework rewrite risk.
 
 ## Core Purpose
 - Ingest existing suites from multiple frameworks and identify behavioral intent.
@@ -17,13 +17,13 @@
 5. Emit translated suites, compatibility reports, and verification checkpoints.
 
 ## Intended Module Interop
-- `Scrapetag` provides resilient selectors and interaction alias maps.
+- `SCRAPEtag` provides resilient selectors and interaction alias maps.
 - `GHOSTstub` provides deterministic payload scenarios for repeatable validation.
-- `BLACKbox` consumes both to increase translation fidelity and reduce flaky post-migration behavior.
+- `BlackBox` consumes both to increase translation fidelity and reduce flaky post-migration behavior.
 
 ## Current Status
 - Module scaffold exists under `Toolbelt/BlackBox`.
-- Sidebar slot is wired in GHOSTops Terminal as an operational module.
+- Sidebar slot is wired in GhostOps Terminal as an operational module.
 - Intro boot media is registered for module-load theater.
 - Conversion engine and validation pipeline are not implemented yet.
 
@@ -35,4 +35,4 @@
 - Session export for reproducible migration runs.
 
 ## Status
-**In Progress** - BLACKbox is actively being integrated and is not yet production-ready.
+**In Progress** - `BlackBox` is actively being integrated and is not yet production-ready.

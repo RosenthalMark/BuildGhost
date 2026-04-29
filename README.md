@@ -1,142 +1,144 @@
-# BUILDGHOST: The QA x AI ecosystem
+# BuildGhost
 
-> **SYSTEM OVERVIEW:** A centralized GHOSTOPS-powered ecosystem for high-stakes software delivery. Engineered to replace legacy friction with bulletproof release gates and intelligent automation.
+BuildGhost is a QA operations platform for teams that need stronger release confidence than conventional test stacks can provide.
 
----
+The repo is centered around `ghostops-terminal`, a desktop control surface for a growing toolbelt of modules that share runtime signals, selectors, scenarios, and execution context. The goal is not "AI tests." The goal is a smarter QA operating layer that can inspect real systems, explain risk, generate stable automation inputs, and help engineers verify changes faster.
 
-### QUICK START
+## What BuildGhost Is Trying To Solve
 
-#### Install Dependencies
+Modern test automation breaks for predictable reasons:
+
+- selectors are brittle and unreadable
+- test suites become framework-specific debt
+- environments are too clean to reproduce real failures
+- upstream APIs make local and CI validation noisy
+- payment and funnel regressions are difficult to model safely
+- teams spend more time maintaining checks than learning from them
+
+BuildGhost exists to reduce that maintenance burden and push QA closer to a shared intelligence system instead of a pile of disconnected scripts.
+
+## Core Idea
+
+BuildGhost is being built as a Smart IDE for QA and release engineering. Each module handles a specialized job, but the long-term value comes from interop:
+
+- a DOM-mapping module can discover risky selectors, assign readable aliases, and feed those selectors into migration or test-generation flows
+- a stubbing module can supply deterministic payloads for the same interactions discovered elsewhere
+- a hostile-environment runner can pressure-test generated or imported code under controlled failure conditions
+- a payment-state module can capture and replay funnel behavior with deterministic state snapshots
+- a suite-conversion module can translate legacy automation while preserving the reason each check exists
+
+The system is designed so modules do not operate in isolation. They contribute data to a shared QA graph.
+
+## Current Repo Structure
+
+- [`ghostops-terminal`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/ghostops-terminal): Electron-based control surface for the BuildGhost toolbelt
+- [`Toolbelt/SCRAPEtag`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/SCRAPEtag): DOM discovery, selector scoring, and aliasing
+- [`Toolbelt/GHOSTstub`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/GHOSTstub): deterministic API stubbing layer
+- [`Toolbelt/BlackBox`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/BlackBox): automation migration and release-intelligence module
+- [`Toolbelt/Spooler`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/Spooler): hostile-environment execution harness
+- [`Toolbelt/Trace`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/Trace): payment and transaction state engine
+
+## Module Snapshot
+
+| Module | Purpose | Status |
+| --- | --- | --- |
+| `SCRAPEtag` | Crawl or inspect a target app, identify interactive elements, score selector risk, and generate readable aliases plus stronger automation hooks | Active foundation, broader crawler/injection workflow still expanding |
+| `GHOSTstub` | Stabilize local and CI runs with deterministic API payloads, edge-case variants, and reusable fixtures | Scaffolded, core engine pending |
+| `BlackBox` | Translate suites across frameworks and preserve behavioral intent during migration | In progress |
+| `Spooler` | Spin hostile, reproducible execution environments with resource pressure, latency, loss, and outage simulation | In progress with substantial local harness capability |
+| `Trace` | Capture, normalize, and replay payment or transaction funnel state | Early module shell, deeper contracts planned |
+
+## What Makes The Vision Different
+
+The direction here is more specific than generic "AI QA":
+
+### 1. Selector intelligence instead of selector sprawl
+
+`SCRAPEtag` is aimed at replacing nested XPath and fragile CSS chains with:
+
+- human-readable aliases
+- confidence-scored selectors
+- visible risk overlays in the inspected page
+- eventually, auto-injected stable data hooks in the source codebase
+
+That means the system should not just find elements. It should tell you which selectors are dangerous, why they are dangerous, and how to make them maintainable.
+
+### 2. Reproducible failure instead of vague flakiness
+
+`Spooler` is intended to turn "could not reproduce" into a concrete scenario:
+
+- constrained CPU and memory
+- degraded network conditions
+- third-party outages
+- injected fault modes
+- replayable artifacts for local and CI execution
+
+### 3. Intent preservation instead of raw test translation
+
+`BlackBox` is not just about syntax conversion between Selenium, Cypress, and Playwright. The important problem is preserving the purpose of a check:
+
+- what user flow the test protects
+- what state or assertion matters
+- which waits and selectors are safe to modernize automatically
+- where confidence is too low and a human needs to intervene
+
+### 4. Shared QA memory instead of disconnected modules
+
+The long-term system should let one module improve another:
+
+- selector maps from `SCRAPEtag`
+- stub profiles from `GHOSTstub`
+- hostile scenario outputs from `Spooler`
+- funnel telemetry from `Trace`
+- migration context from `BlackBox`
+
+That interop is the product.
+
+## Quick Start
+
+### Install dependencies
 
 ```bash
-# root repo dependencies
 npm install
-
-# GhostOps Terminal app dependencies
 cd ghostops-terminal
 npm install
 ```
 
-#### Run GhostOps Terminal
+### Run the terminal
 
 ```bash
-cd ghostops-terminal
 npm start
 ```
 
-#### Ghost CMS Lifecycle Commands (Optional)
+The root `start` script launches `ghostops-terminal`.
 
-Run these from your Ghost install directory:
+## GhostOps Terminal
 
-```bash
-ghost start
-ghost stop
-ghost restart
-ghost status
-```
+`ghostops-terminal` is the current command center for the ecosystem. It is the shell where modules are surfaced, boot flows are managed, and module-specific UI is presented.
 
-If configured in your shell, helper command:
+See:
 
-```bash
-ghostops start
-ghostops stop
-ghostops restart
-ghostops status
-```
+- [`ghostops-terminal/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/ghostops-terminal/README.md)
+- [`ARCHITECTURE.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/ARCHITECTURE.md)
 
----
+## Recommended Reading By Module
 
-### VERSIONING + CHANGELOG
+- [`Toolbelt/SCRAPEtag/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/SCRAPEtag/README.md)
+- [`Toolbelt/GHOSTstub/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/GHOSTstub/README.md)
+- [`Toolbelt/BlackBox/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/BlackBox/README.md)
+- [`Toolbelt/Spooler/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/Spooler/README.md)
+- [`Toolbelt/Trace/README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Toolbelt/Trace/README.md)
 
-- `VERSION` at repo root is the current release baseline (`MAJOR.MINOR.PATCH`).
-- `CHANGELOG.md` at repo root is the canonical release history.
-- Bump rules:
-  - `MAJOR`: huge update affecting broad system behavior.
-  - `MINOR`: scoped feature-area update.
-  - `PATCH`: hotfix, spelling/typo, or small correction.
-- Every merge that changes behavior should update `CHANGELOG.md`; version bumps should update both `VERSION` and `CHANGELOG.md` in the same change.
+## Build Principles
 
----
+- AI should reduce grunt work, not replace engineering judgment
+- low-confidence output should surface uncertainty, not fabricate certainty
+- stable automation hooks are more valuable than clever brittle ones
+- modules should produce reusable artifacts, not isolated one-off results
+- local reproduction and CI reproduction should converge as much as possible
 
-### THE PROBLEM
-Modern software delivery is crippled by **brittle automation** and **reactive quality gates**. Traditional QA suites rely on static selectors and manual oversight, leading to high maintenance costs, flaky pipelines, and a lack of confidence at the moment of deployment. As systems scale, the "Test Debt" eventually outpaces feature development.
+## Current State
 
-### THE SOLUTION
-**BUILDGHOST** introduces a paradigm shift by centralizing an elite **QA TOOLBELT** into a unified execution environment. By leveraging AI-driven fingerprinting and autonomous PR auditing, the suite transforms quality from a bottleneck into a high-velocity asset.
+This repo is not pretending every module is complete. Some parts are operational, some are scaffolded, and some are still design-forward. The direction is serious, but the implementation is still being assembled module by module.
 
----
-
-### CORE ARCHITECTURE: `GHOSTOPS TERMINAL`
-The **GHOSTops TERMINAL** is the required kernel for the BuildGhost ecosystem. It provides a high-performance, dynamic UI that serves as the centralized command center for all modular tooling.
-
-* **CENTRALIZED ORCHESTRATION:** Managing the lifecycle and execution of all modular tools from a single interface.
-* **UNIFIED DATA PIPELINE:** Aggregating intelligence across the entire toolbelt to provide a holistic view.
-* **ENVIRONMENT AGNOSTIC:** Bridging the gap between local development and enterprise-grade CI/CD.
-
----
-
-### THE TOOLBELT // MODULES
-
-#### `SCRAPETAG // INTELLIGENT DOM MAPPING`
-An advanced discovery engine that crawls target applications to identify, categorize, and tag interactive DOM elements. SCRAPETAG eliminates selector-related technical debt by generating resilient, human-readable data attributes.
-* **STATUS:** ![Active](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
-
-#### `GHOSTSTUB // RESPONSE STUB ORCHESTRATION`
-A tactical stubbing layer for stabilizing QA workflows when upstream APIs are unavailable, unstable, or expensive to hit repeatedly. GHOSTSTUB can mirror production payload shapes, inject edge-case variants on demand, and provide reusable fixtures that downstream modules can consume during local and CI validation.
-* **STATUS:** ![Active](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
-
-#### `PROJECT BLACKBOX // RELEASE INTELLIGENCE CORE`
-A release intelligence and test migration module that correlates execution signals while enabling push-button framework conversion across suites (for example `Selenium -> Playwright` and `Cypress -> Playwright`). PROJECT BLACKBOX is designed to reduce rewrite cost, preserve intent, and accelerate safer modernization of legacy automation stacks.
-* **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
-
-#### `SPOOLER // HOSTILE ENVIRONMENT RUNNER`
-A local-first hostile-environment harness that turns a scenario config and probe payload into reproducible Docker artifacts. SPOOLER applies real runtime pressure — CPU/memory limits, netem latency/loss, fault injection, and third-party outage simulation — and surfaces pass/fail results with full logs in both the app and CI pipelines. Plugs directly into GHOSTops Terminal as an embedded Streamlit webview.
-* **STATUS:** ![In Progress](https://img.shields.io/badge/STATUS-IN_PROGRESS-brightgreen?style=flat-square)
-
----
-
-### ROADMAP: The Evolution of GHOSTops
-
-#### `BUILDGHOST // MODULE_BETA [PLACEHOLDER]`
-Reserved for the next tactical module release.
-* **STATUS:** ![Backlog](https://img.shields.io/badge/STATUS-BACKLOG-lightgray?style=flat-square)
-
-#### `BUILDGHOST // MODULE_GAMMA [PLACEHOLDER]`
-Reserved for the next tactical module release.
-* **STATUS:** ![Backlog](https://img.shields.io/badge/STATUS-BACKLOG-lightgray?style=flat-square)
-
-#### `BUILDGHOST // MODULE_DELTA [PLACEHOLDER]`
-Reserved for the next tactical module release.
-* **STATUS:** ![Backlog](https://img.shields.io/badge/STATUS-BACKLOG-lightgray?style=flat-square)
-
-#### [ MODULE_RESERVED ]
-**SYSTEM NOTE:** Space allocated for future AI-driven quality initiatives and proprietary tooling.
-
-#### [ MODULE_RESERVED ]
-**SYSTEM NOTE:** Space allocated for future AI-driven quality initiatives and proprietary tooling.
-
-#### [ MODULE_RESERVED ]
-**SYSTEM NOTE:** Space allocated for future AI-driven quality initiatives and proprietary tooling.
-
-#### [ MODULE_RESERVED ]
-**SYSTEM NOTE:** Space allocated for future AI-driven quality initiatives and proprietary tooling.
-
----
-### ARCHITECTURE PHILOSOPHY
-1. **INTELLIGENCE OVER STATIC LOGIC:** Moving beyond hardcoded scripts and using AI to understand intent.
-2. **MODULAR SCALABILITY:** Housing 50+ specialized utilities without bloating the core engine.
-3. **DEVELOPER-FIRST DX:** Optimizing for speed and ease of use to ensure quality is a feature, not a hurdle.
-
----
-
-### THE GHOSTOPS MANIFESTO: AI as a Force Multiplier
-
-BuildGhost is built on the belief that **Artificial Intelligence is a force multiplier, not a substitute for engineering judgment.** Within the GHOSTOPS ecosystem, AI handles the heavy lifting—the discovery, the mapping, and the boilerplate. However, the system is architected to ensure that the human remains the *final authority*. We do not blindly trust; we verify.
-
-* **TRUST BUT VERIFY:** Every AI-generated tag, test case, or PR must be reconciled by an engineer.
-* **ELIMINATING HALLUCINATIONS:** Our logic is built to favor "No Data" over "Wrong Data." If the AI cannot achieve high-confidence fingerprinting, it defers to the human operator.
-* **STRATEGIC OVERSIGHT:** We use AI to remove the "grunt work" so that engineers can focus on complex edge cases and architectural integrity.
-
-**Automation is the engine, but human intelligence is the navigator.** **Never rely on the machine to define your quality standards—use it to enforce them.**
-
----
+That is exactly why the architecture matters: BuildGhost is being built to become a unified QA operating system, not a collection of throwaway experiments.

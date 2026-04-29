@@ -1,129 +1,66 @@
-# GHOSTops Terminal — Module Development Standard
+# Contributing To BuildGhost
 
-> This document defines the contract every module must fulfill to integrate
-> with GHOSTops Terminal. It applies to internal BuildGhost modules and
-> future third-party marketplace modules equally.
+This repo is an active platform build, not a finished product. Contributions should favor clarity, modularity, and truthful documentation over hype or placeholder behavior.
 
----
+## What Belongs Here
 
-## Module File Structure
+Use this file for repo-level contribution expectations:
 
-Every module lives inside the `Toolbelt/` directory:
-```
-Toolbelt/
-  YourModuleName/
-    index.js              ← REQUIRED: module entry point
-    assets/
-      yourmodule-boot.mp4 ← REQUIRED: boot sequence video (16:9, max 15s)
-      yourmodule-logo.png ← REQUIRED: Module Dock logo (recommended 480x120px)
-    README.md             ← REQUIRED: module documentation
-```
+- how to structure changes
+- what to update when behavior changes
+- where module-specific integration rules live
+- how to avoid leaking private planning material
 
----
+## Before You Open A PR
 
-## Step-by-Step: Registering a New Module
+- keep changes scoped to a clear feature, fix, or documentation pass
+- avoid mixing unrelated refactors into the same change
+- update docs when user-visible behavior or module contracts change
+- do not present planned behavior as implemented behavior
 
-### 1. Add your entry to `moduleBootConfig` in `src/services/bootManager.js`
-```javascript
-const moduleBootConfig = {
-  YourModuleName: {
-    video: 'assets/modules/yourmodulename/yourmodule-boot.mp4',
-    color: '#b8ff5a' // accent color for boot screen overlay text
-  }
-}
-```
+## Documentation Rules
 
-### 2. Add your module entry to `toolConfig` in `renderer.js`
-```javascript
-const toolConfig = {
-  YourModuleName: {
-    preview: 'assets/previews/yourmodule.gif',
-    description: 'One sentence describing what this module does.',
-    expectedPath: '../Toolbelt/YourModuleName/index.js'
-  }
-}
-```
+- the root [`README.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/README.md) should explain what BuildGhost is, what exists now, and how to get oriented
+- module-specific behavior belongs in that module's own `README.md`
+- terminal integration requirements belong in [`Docs/module-development-standard.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Docs/module-development-standard.md)
+- release/versioning process belongs in [`Docs/release-policy.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Docs/release-policy.md)
 
-### 3. Add your nav button to `index.html`
-```html
-<button class="nav-item module-slot" data-route="tool" data-tool="YourModuleName">
-  <span class="nav-logo-wrap">
-    <img class="nav-tool-logo"
-         src="../Toolbelt/YourModuleName/assets/yourmodule-logo.png"
-         alt="YourModuleName" />
-    <span class="tool-live-dot" aria-hidden="true"></span>
-  </span>
-  <span class="nav-meta">Your Module Tagline</span>
-</button>
-```
+## Behavior Changes
 
-### 4. Add your module to `ALLOWED_TOOLS` in `main.js`
-```javascript
-const ALLOWED_TOOLS = new Set(['scrapetag', 'GHOSTstub', 'YourModuleName'])
-```
+If your change affects shipped behavior:
 
-### 5. Drop your boot video and logo into the assets folder
-```
-ghostops-terminal/assets/modules/yourmodulename/yourmodule-boot.mp4
-ghostops-terminal/assets/modules/yourmodulename/yourmodule-logo.png
-```
+- update [`CHANGELOG.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/CHANGELOG.md)
+- update the relevant module or repo documentation
+- bump [`VERSION`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/VERSION) only when the change is actually release-worthy under the release policy
 
-That's it. Zero new logic. Zero new functions. The Terminal handles the rest.
+See:
 
----
+- [`Docs/release-policy.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Docs/release-policy.md)
 
-## Boot Video Spec
+## Module Work
 
-| Property    | Requirement                        |
-|-------------|------------------------------------|
-| Format      | MP4 (H.264)                        |
-| Aspect      | 16:9 preferred, square acceptable  |
-| Duration    | 5–15 seconds                       |
-| Audio       | Silent / muted                     |
-| Style       | Match GHOSTops Terminal aesthetic  |
+If you are adding or wiring a new module into `ghostops-terminal`, follow the terminal integration contract instead of inventing a new pattern.
 
----
+See:
 
-## Logo Spec
+- [`Docs/module-development-standard.md`](/Users/markrosenthal/Desktop/REPOS/BuildGhost/Docs/module-development-standard.md)
 
-| Property    | Requirement                        |
-|-------------|------------------------------------|
-| Format      | PNG with transparent background    |
-| Dimensions  | 480 × 120px recommended            |
-| Style       | High contrast, legible at 200px wide |
+## Private Material
 
----
+Do not commit private planning or roadmap material.
 
-## Module Entry Point Contract (`index.js`)
+- `ROADMAP.md` is intentionally ignored
+- private planning docs should stay out of tracked repo history
+- if a document should never be public, do not rely on habit alone; keep it untracked
 
-Your `index.js` must export at minimum:
-```javascript
-module.exports = {
-  id: 'YourModuleName',     // must match key in moduleBootConfig exactly
-  version: '1.0.0',
-  run: async () => {
-    // module logic here
-  }
-}
-```
+## Pull Request Checklist
 
----
+- [ ] change is scoped and coherent
+- [ ] docs reflect reality
+- [ ] `CHANGELOG.md` updated if behavior changed
+- [ ] `VERSION` updated only if release policy requires it
+- [ ] no private planning material was added to tracked files
 
-## Marketplace Submission Checklist
+## Questions
 
-Before submitting a module to the GHOSTops Marketplace:
-
-- [ ] `index.js` exports `id`, `version`, and `run`
-- [ ] Boot video is MP4, under 15 seconds, silent
-- [ ] Logo is PNG, transparent background
-- [ ] `README.md` exists and documents all module features
-- [ ] Module tested against latest GHOSTops Terminal release
-- [ ] No external network calls without explicit user consent
-- [ ] No access to filesystem paths outside module's own `assets/` folder
-- [ ] Submitted with contact email for support
-
----
-
-## Questions?
-
-Contact: buildghost.dev@gmail.com
+For module integration details, read the module development standard first.

@@ -1,4 +1,4 @@
-# GHOSTops Architecture & Design System
+# GhostOps Terminal Architecture & Design System
 
 ## The "Chameleon" Theming Engine
 The UI is strictly driven by CSS variables to allow instant, global aesthetic shifts with a single class toggle. This ensures the application can adapt to both tactical environments and corporate screen-sharing scenarios.

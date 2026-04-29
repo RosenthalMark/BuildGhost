@@ -9,10 +9,10 @@
 - Keep frontend and automation work moving while upstream services change.
 
 ## Intended Module Interop
-- `Scrapetag` captures selectors and interaction targets.
+- `SCRAPEtag` captures selectors and interaction targets.
 - `GHOSTstub` supplies predictable data behind those interactions.
 - Future modules can consume both:
-  - selector maps from `Scrapetag`
+  - selector maps from `SCRAPEtag`
   - scenario payload sets from `GHOSTstub`
 
 ## Current Status
